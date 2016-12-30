@@ -1,0 +1,35 @@
+Regular Expressions
+Regular expressions are a powerful tool for text processing. They provide a way to simply and
+tersely describe patterns in text (e.g., a U.S. ZIP code such as TX 77845 , or an ISO-style date, such
+as 2009−06−07 ) and to efficiently find such patterns in text. In <regex> , the standard library provides
+support for regular expressions in the form of the std::regex class and its supporting functions. To
+give a taste of the style of the regex library, let us define and print a pattern:
+regex pat (R"(\w{2}\s∗\d{5}(−\d{4})?)");
+cout << "pattern: " << pat << '\n';
+// ZIP code pattern: XXddddd-dddd and var iants128
+A Tour of C++: Concurrency and Utilities
+Chapter 5
+People who have used regular expressions in just about any language will find \w{2}\s∗\d{5}(−\d{4})?
+familiar. It specifies a pattern starting with two letters \w{2} optionally followed by some space \s∗
+followed by five digits \d{5} and optionally followed by a dash and four digits −\d{4} . If you are not
+familiar with regular expressions, this may be a good time to learn about them ([Stroustrup,2009],
+[Maddock,2009], [Friedl,1997]). Regular expressions are summarized in §37.1.1.
+To express the pattern, I use a raw string literal (§7.3.2.1) starting with R"( and terminated by )" .
+This allows backslashes and quotes to be used directly in the string.
+The simplest way of using a pattern is to search for it in a stream:
+int lineno = 0;
+for (string line; getline(cin,line);) {
+// read into line buffer
+++lineno;
+smatch matches;
+// matched strings go here
+if (regex_search(line ,matches,pat))
+// search for pat in line
+cout << lineno << ": " << matches[0] << '\n';
+}
+The regex_search(line ,matches,pat) searches the line for anything that matches the regular expression
+stored in pat and if it finds any matches, it stores them in matches . If no match was found,
+regex_search(line ,matches,pat) returns false . The matches variable is of type smatch . The ‘‘s’’
+stands for ‘‘sub’’ and an smatch is a vector of sub-matches. The first element, here matches[0] , is
+the complete match.
+For a more complete description see Chapter 37.
