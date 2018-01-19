@@ -5,6 +5,8 @@ project(ExCpp C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 11)
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/utils)
+
 function(add_exercise CHAPTER EXERCISE)
 	set(EXECUTABLE ${CHAPTER}/${EXERCISE}.cpp)
 	add_executable(${EXERCISE} ${EXECUTABLE})
@@ -20,3 +22,7 @@ add_exercise(expressions ReadPairs)
 add_exercise(expressions Bitwise)
 add_exercise(expressions Strings)
 add_exercise(expressions Calculator)
+
+add_exercise(select-operations BadAlloc)
+add_exercise(select-operations SumElements)
+add_exercise(select-operations Apply)
