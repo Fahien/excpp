@@ -26,3 +26,8 @@ add_exercise(expressions Calculator)
 add_exercise(select-operations BadAlloc)
 add_exercise(select-operations SumElements)
 add_exercise(select-operations Apply)
+
+add_exercise(functions HelloWorld)
+add_exercise(functions Cat)
+add_exercise(functions Tree)
+add_exercise(functions Encrypt)
