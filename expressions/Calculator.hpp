@@ -62,6 +62,7 @@ class Calculator
 public:
 	Calculator();
 	Calculator(TokenStream& tokenStream);
+	Calculator(TokenStream&& tokenStream);
 
 	double Prim(bool get);
 

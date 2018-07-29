@@ -216,6 +216,12 @@ clc::Calculator::Calculator()
 :	clc::Calculator{ clc::TokenStream{ std::cin } }
 {}
 
+clc::Calculator::Calculator(clc::TokenStream&& tokenStream)
+:	mTokenStream{ tokenStream }
+{
+	mTable["pi"] = 3.1415926535897932385;
+	mTable["e"]  = 2.7182818284590452354;
+}
 
 clc::Calculator::Calculator(clc::TokenStream& tokenStream)
 :	mTokenStream{ tokenStream }

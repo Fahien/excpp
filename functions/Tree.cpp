@@ -1,5 +1,13 @@
 #include <string>
 #include <iostream>
+#include <stdexcept>
+
+
+class NotFoundException : public std::runtime_error
+{
+public:
+	NotFoundException(std::string msg) : std::runtime_error{ msg } {}
+};
 
 
 struct Node
@@ -18,11 +26,13 @@ public:
 	~Tree();
 
 	Node* Insert(std::string word);
+	Node* Find(std::string word);
 
 	std::string ToString();
 
 private:
 	Node* insertNode(Node** node, std::string word);
+	Node* find(Node*, std::string word);
 	void deleteNodes(Node* node);
 
 	std::string toString(Node* node, std::string& tree);
@@ -97,6 +107,34 @@ Node* Tree::insertNode(Node** pNode, std::string word)
 }
 
 
+Node* Tree::Find(std::string word)
+{
+	return find(mRoot, word);
+}
+
+
+Node* Tree::find(Node* node, std::string word)
+{
+	if (node == nullptr)
+	{
+		throw NotFoundException{ "Node not found" };
+	}
+
+	if (node->word == word)
+	{
+		return node;
+	}
+	else if (node->word > word)
+	{
+		return find(node->left, word);
+	}
+	else
+	{
+		return find(node->right, word);
+	}
+}
+
+
 std::string Tree::ToString()
 {
 	std::string tree{ "" };
@@ -131,6 +169,18 @@ int main()
 	tree.Insert("j");
 
 	std::cout << tree.ToString() << std::endl;
+
+	Node* found{ tree.Find("b") };
+	std::cout << "Node found: " << found->word << std::endl;
+
+	try
+	{
+		tree.Find("z");
+	}
+	catch (const NotFoundException& e)
+	{
+		std::cerr << "Exception captured: " << e.what() << std::endl;
+	}
 
 	return EXIT_SUCCESS;
 }
