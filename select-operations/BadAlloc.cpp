@@ -19,7 +19,7 @@ int main()
 	{
 		while (true)
 		{
-			auto memory = new char[bytes];
+			/* "not used" auto memory = */ new char[bytes];
 			total += bytes;
 			bytes *= 2;
 		}

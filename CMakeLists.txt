@@ -4,6 +4,11 @@ project(ExCpp C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 11)
 
+if(MSVC)
+	# Disable MSVC deprecations
+	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/utils)
 
 function(add_exercise CHAPTER EXERCISE)
@@ -36,3 +41,5 @@ add_exercise(exception-handling IoEx)
 add_exercise(exception-handling MainCatcher)
 add_exercise(exception-handling Vector)
 add_exercise(exception-handling Insexception)
+
+add_exercise(files Includes)
