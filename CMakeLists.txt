@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.5)
 project(ExCpp C CXX)
 
 set(CMAKE_C_STANDARD 11)
@@ -43,3 +43,8 @@ add_exercise(exception-handling Vector)
 add_exercise(exception-handling Insexception)
 
 add_exercise(files Includes)
+
+add_exercise(classes Date)
+add_exercise(classes Histogram)
+add_exercise(classes Table)
+add_exercise(classes Set)
