@@ -1,8 +1,7 @@
-cmake_minimum_required( VERSION 3.5 )
-project( ExCpp C CXX )
+cmake_minimum_required( VERSION 3.7 )
+project( ExCpp LANGUAGES C CXX )
 
-set( CMAKE_C_STANDARD 11 )
-set( CMAKE_CXX_STANDARD 11 )
+set( CMAKE_CXX_STANDARD 17 )
 
 if( MSVC )
 	# Disable MSVC deprecations
@@ -34,6 +33,7 @@ add_exercise( functions HelloWorld )
 add_exercise( functions Cat )
 add_exercise( functions Tree )
 add_exercise( functions Encrypt )
+add_subdirectory( "functions/static" )
 
 add_exercise( exception-handling CheckedPtr )
 add_exercise( exception-handling Integer )
@@ -52,3 +52,4 @@ add_exercise( classes Set )
 add_exercise( construction-cleanup-copy-and-move Handle )
 
 add_subdirectory( "construction-cleanup-copy-and-move" )
+add_subdirectory( "overloading" )
