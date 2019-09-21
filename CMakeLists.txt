@@ -8,6 +8,7 @@ if( MSVC )
 	add_definitions( -D_CRT_SECURE_NO_WARNINGS )
 endif()
 
+add_subdirectory( ${CMAKE_CURRENT_SOURCE_DIR}/core )
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/utils )
 
 function( add_exercise CHAPTER EXERCISE )
@@ -53,3 +54,4 @@ add_exercise( construction-cleanup-copy-and-move Handle )
 
 add_subdirectory( "construction-cleanup-copy-and-move" )
 add_subdirectory( "overloading" )
+add_subdirectory( "special-operations" )

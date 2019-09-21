@@ -16,6 +16,7 @@ class String
 
 	size_t GetLength() const { return m_Length; }
 	const char* GetCStr() const { return reinterpret_cast<const char*>( m_Buffer ); }
+	char* get_mut_c_str() { return reinterpret_cast<char*>( m_Buffer ); }
 
 	String& operator+=( const char* rhs );
 	bool operator==( const char* other ) const;

@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <cassert>
 
-#include "ExString.h"
+#include <ExString.h>
 
 using namespace excpp;
 
