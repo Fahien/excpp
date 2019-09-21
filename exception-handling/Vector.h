@@ -9,7 +9,6 @@
 namespace excpp
 {
 
-
 template <typename T>
 class Vector
 {
@@ -144,7 +143,7 @@ void Vector<T>::resize( size_t capacity )
 		T* newBase = new T[mCapacity];
 		if (!newBase)
 		{
-			throw length_error{ "Error while resizing: No more space left" };
+			throw std::length_error{ "Error while resizing: No more space left" };
 		}
 		std::uninitialized_copy( begin(), end(), newBase );
 		// Substitute
@@ -195,7 +194,7 @@ T& Vector<T>::At( const size_t p )
 {
 	if ( p > mSize )
 	{
-		throw out_of_range{ "Position out of vector range" };
+		throw std::out_of_range{ "Position out of vector range" };
 	}
 
 	return mBase[p];
@@ -207,7 +206,7 @@ T& Vector<T>::Front()
 {
 	if ( mSize == 0 )
 	{
-		throw out_of_range{ "Vector is empty" };
+		throw std::out_of_range{ "Vector is empty" };
 	}
 	return mBase[0];
 }
@@ -218,7 +217,7 @@ T& Vector<T>::Back()
 {
 	if ( mSize == 0 )
 	{
-		throw out_of_range{ "Vector is empty" };
+		throw std::out_of_range{ "Vector is empty" };
 	}
 	return mBase[mSize - 1];
 }
