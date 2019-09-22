@@ -6,7 +6,7 @@ namespace excpp
 {
 
 StringIterator::StringIterator( String& s )
-:	it { s.get_mut_c_str(), s.GetLength() }
+:	it { s.get_mut_c_str(), s.get_length() }
 {}
 
 char& StringIterator::next()

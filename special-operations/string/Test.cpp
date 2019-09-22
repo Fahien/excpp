@@ -23,5 +23,10 @@ int main()
 	{
 	}
 
+	// Test substring
+	auto ell = hello( 1, 3 );
+	std::cout << ell << std::endl;
+	assert( ell == "ell" );
+
 	return EXIT_SUCCESS;
 }

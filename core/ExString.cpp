@@ -3,12 +3,16 @@
 #include "ExString.h"
 
 
-using namespace excpp;
+namespace excpp
+{
+String::String( const char* str )
+: String( str, std::strlen( str ) )
+{}
 
 
-String::String( const char* str, size_t minCapacity )
+String::String( const char* str, const size_t len, const size_t minCapacity )
 :	m_Capacity { kDefaultCapacity }
-,	m_Length { std::strlen( str ) }
+,	m_Length { len }
 {
 	init( str, minCapacity );
 }
@@ -35,7 +39,7 @@ String::String( const String& other, size_t minCapacity )
 :	m_Capacity { other.m_Capacity }
 ,	m_Length { other.m_Length }
 {
-	init( other.GetCStr(), minCapacity );
+	init( other.get_c_str(), minCapacity );
 }
 
 
@@ -69,31 +73,54 @@ String& String::operator+=( const char* rhs )
 
 bool String::operator==( const char* other ) const
 {
-	return std::strcmp( GetCStr(), other ) == 0;
+	return std::strncmp( get_c_str(), other, std::min( get_length(), std::strlen( other ) ) ) == 0;
 }
 
 
 bool String::operator==( const String& other ) const
 {
-	return *this == other.GetCStr();
+	return *this == other.get_c_str();
 }
 
 
-String excpp::operator"" _str( const char* str, size_t len )
+String String::operator()( size_t begin, size_t length )
+{
+	if ( begin < get_length() && length <= get_length() - begin && length > 0 )
+	{
+		auto substr_begin = get_c_str() + begin;
+		// TODO: Fix this, length is capacity
+		return String{ substr_begin, length };
+	}
+
+	return {};
+}
+
+
+String operator"" _str( const char* str, size_t len )
 {
 	return String{ str, len };
 }
 
 
-String excpp::operator+( const String& lhs, const char* rhs )
+String operator+( const String& lhs, const char* rhs )
 {
-	String ret { lhs, lhs.GetLength() + std::strlen( rhs ) };
+	String ret { lhs, lhs.get_length() + std::strlen( rhs ) };
 	return ret += rhs;
 }
 
 
-String excpp::operator+( const String& lhs, const String& rhs )
+String operator+( const String& lhs, const String& rhs )
 {
-	String ret { lhs, lhs.GetLength() + rhs.GetLength() };
-	return ret += rhs.GetCStr();
+	String ret { lhs, lhs.get_length() + rhs.get_length() };
+	return ret += rhs.get_c_str();
 }
+
+
+std::ostream &operator<<(std::ostream& os, String &str)
+{
+	std::for_each_n( str.get_c_str(), str.get_length(), [&os]( const char c ) { os << c; } );
+	return os;
+}
+
+
+} // namespace excpp
