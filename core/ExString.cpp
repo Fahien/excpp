@@ -38,6 +38,32 @@ bool StringView::operator==( const String& other ) const
 }
 
 
+char& StringView::operator[]( const size_t pos )
+{
+	assert( pos < get_length() );
+	return *( get_mut_c_str() + pos );
+}
+
+
+char StringView::operator[]( const size_t pos ) const
+{
+	assert( pos < get_length() );
+	return *( get_c_str() + pos );
+}
+
+
+
+StringView StringView::operator()( const size_t begin, const size_t length ) const
+{
+	if ( begin < get_length() && length <= get_length() - begin && length > 0 )
+	{
+		return StringView{ str, begin + begin, length };
+	}
+
+	return { *this };
+}
+
+
 const String& StringView::get_str() const
 {
 	return str;
@@ -47,6 +73,12 @@ const String& StringView::get_str() const
 const char* StringView::get_c_str() const
 {
 	return str.get_c_str() + begin;
+}
+
+
+char* StringView::get_mut_c_str()
+{
+	return str.get_mut_c_str() + begin;
 }
 
 
@@ -153,6 +185,15 @@ StringView String::operator()( const size_t begin, const size_t length )
 	}
 
 	return { *this };
+}
+
+
+String::operator char*() const
+{
+	auto ret = new char[m_Length + 1];
+	ret[m_Length] = 0;
+	std::copy_n( get_c_str(), m_Length, ret );
+	return ret;
 }
 
 

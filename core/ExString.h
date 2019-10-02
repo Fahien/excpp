@@ -21,8 +21,14 @@ class StringView
 	bool operator==( const char* other ) const;
 	bool operator==( const String& other ) const;
 
+	char& operator[]( size_t pos );
+	char operator[]( size_t pos ) const;
+	
+	StringView operator()( size_t begin, size_t length ) const;
+
 	const String& get_str() const;
 	const char* get_c_str() const;
+	char* get_mut_c_str();
 
 	size_t get_length() const;
 
@@ -53,6 +59,9 @@ class String
 
 	/// Substring operator
 	StringView operator()( size_t begin, size_t length );
+
+	/// @return A C style string which must be deleted by the caller
+	explicit operator char*() const;
 
   private:
 	void init( const char* str, size_t minCapacity );

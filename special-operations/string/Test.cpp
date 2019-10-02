@@ -32,5 +32,10 @@ int main()
 	std::cout << hello << std::endl;
 	assert( hello == "Heelllo" );
 
+	auto c_hello = static_cast<char*>( hello );
+	std::cout << c_hello << std::endl;
+	assert( std::strlen( c_hello ) == hello.get_length() );
+	delete[] c_hello;
+
 	return EXIT_SUCCESS;
 }
