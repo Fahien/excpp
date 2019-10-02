@@ -5,6 +5,57 @@
 
 namespace excpp
 {
+
+StringView::StringView( String& s, const size_t b, const size_t l )
+:	str { s }
+,	begin { b }
+,	length { l }
+{}
+
+
+void StringView::operator=( const String& other )
+{
+	// Save string before view
+	auto before = str( 0, begin );
+	// Save string after view
+	auto after = str( begin + length, str.get_length() - ( begin + length ) );
+	// Put other in str
+	str = before + other + after;
+	// Update length
+	length = other.get_length();
+}
+
+
+bool StringView::operator==( const char* other ) const
+{
+	return std::strncmp( get_c_str(), other, std::min( get_length(), std::strlen( other ) ) ) == 0;
+}
+
+
+bool StringView::operator==( const String& other ) const
+{
+	return std::strncmp( get_c_str(), other.get_c_str(), std::min( get_length(), other.get_length() ) ) == 0;
+}
+
+
+const String& StringView::get_str() const
+{
+	return str;
+}
+
+
+const char* StringView::get_c_str() const
+{
+	return str.get_c_str() + begin;
+}
+
+
+size_t StringView::get_length() const
+{
+	return length;
+}
+
+
 String::String( const char* str )
 : String( str, std::strlen( str ) )
 {}
@@ -43,12 +94,11 @@ String::String( const String& other, size_t minCapacity )
 }
 
 
-String& String::operator+=( const char* rhs )
+void String::concat( const char* rhs, const size_t rhsLength )
 {
 	auto capacity = m_Capacity;
 
 	// Check there is enough space
-	auto rhsLength = std::strlen( rhs );
 	while ( capacity < m_Length + rhsLength )
 	{
 		capacity *= 2;
@@ -66,7 +116,19 @@ String& String::operator+=( const char* rhs )
 	// Append
 	std::uninitialized_copy_n( rhs, rhsLength + 1, m_Buffer + m_Length );
 	m_Length += rhsLength;
+}
 
+
+String& String::operator+=( const char* rhs )
+{
+	concat( rhs, std::strlen( rhs ) );
+	return *this;
+}
+
+
+String& String::operator+=( const String& rhs )
+{
+	concat( rhs.get_c_str(), rhs.get_length() );
 	return *this;
 }
 
@@ -83,20 +145,18 @@ bool String::operator==( const String& other ) const
 }
 
 
-String String::operator()( size_t begin, size_t length )
+StringView String::operator()( const size_t begin, const size_t length )
 {
 	if ( begin < get_length() && length <= get_length() - begin && length > 0 )
 	{
-		auto substr_begin = get_c_str() + begin;
-		// TODO: Fix this, length is capacity
-		return String{ substr_begin, length };
+		return StringView{ *this, begin, length };
 	}
 
-	return {};
+	return { *this };
 }
 
 
-String operator"" _str( const char* str, size_t len )
+String operator"" _str( const char* str, const size_t len )
 {
 	return String{ str, len };
 }
@@ -116,7 +176,30 @@ String operator+( const String& lhs, const String& rhs )
 }
 
 
-std::ostream &operator<<(std::ostream& os, String &str)
+String operator+( const String& lhs, const StringView& rhs )
+{
+	String ret { lhs, lhs.get_length() + rhs.get_length() };
+	ret.concat( rhs.get_c_str(), rhs.get_length() );
+	return ret;
+}
+
+
+String operator+( const StringView& lhs, const String& rhs )
+{
+	String ret { "",  0, lhs.get_length() + rhs.get_length() };
+	ret.concat( lhs.get_c_str(), lhs.get_length() );
+	return ret += rhs;
+}
+
+
+std::ostream &operator<<(std::ostream& os, const String &str)
+{
+	std::for_each_n( str.get_c_str(), str.get_length(), [&os]( const char c ) { os << c; } );
+	return os;
+}
+
+
+std::ostream &operator<<(std::ostream& os, const StringView &str)
 {
 	std::for_each_n( str.get_c_str(), str.get_length(), [&os]( const char c ) { os << c; } );
 	return os;

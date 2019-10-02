@@ -28,5 +28,9 @@ int main()
 	std::cout << ell << std::endl;
 	assert( ell == "ell" );
 
+	ell = "eelll";
+	std::cout << hello << std::endl;
+	assert( hello == "Heelllo" );
+
 	return EXIT_SUCCESS;
 }

@@ -9,6 +9,9 @@
 #include <iostream>
 #include <cstdlib>
 
+namespace excpp
+{
+
 
 class Shape
 {
@@ -38,17 +41,19 @@ void apply(std::vector<Shape*> v, std::function<void(Shape*)> f)
 }
 
 
+} // namespace excpp
+
 int main(int argc, char** argv)
 {
-	std::vector<Shape*> shapes{};
+	std::vector<excpp::Shape*> shapes{};
 
 	// Create shapes
 	for (size_t i{ 0 }; i < 8; ++i)
 	{
-		shapes.push_back(new Shape{"Circle"});
+		shapes.push_back(new excpp::Shape{"Circle"});
 	}
 
-	apply(shapes, DegenerateShape);
+	excpp::apply(shapes, excpp::DegenerateShape);
 
 	// Delete shapes
 	for (auto& shape : shapes)
