@@ -52,6 +52,7 @@ add_exercise( classes Set )
 
 add_exercise( construction-cleanup-copy-and-move Handle )
 
-add_subdirectory( "construction-cleanup-copy-and-move" )
-add_subdirectory( "overloading" )
-add_subdirectory( "special-operations" )
+add_subdirectory( construction-cleanup-copy-and-move )
+add_subdirectory( overloading )
+add_subdirectory( special-operations )
+add_subdirectory( derived-classes )
