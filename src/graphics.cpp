@@ -71,7 +71,7 @@ bool Queue::supports_present( VkSurfaceKHR s )
 }
 
 
-void Queue::submit( CommandBuffer& command_buffer, const std::vector<VkSemaphore>& waits, const std::vector<VkSemaphore>& signals, const Fence* fence )
+void Queue::submit( CommandBuffer& command_buffer, const std::vector<VkSemaphore>& waits, const std::vector<VkSemaphore>& signals, Fence* fence )
 {
 	VkSubmitInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -91,10 +91,12 @@ void Queue::submit( CommandBuffer& command_buffer, const std::vector<VkSemaphore
 
 	auto ret = vkQueueSubmit( handle, 1, &info, fence_handle );
 	assert( ret == VK_SUCCESS && "Cannot submit to queue" );
+
+	fence->can_wait = true;
 }
 
 
-void Queue::present( const std::vector<VkSwapchainKHR>& swapchains, const std::vector<uint32_t>& image_indices, const std::vector<VkSemaphore>& waits )
+VkResult Queue::present( const std::vector<VkSwapchainKHR>& swapchains, const std::vector<uint32_t>& image_indices, const std::vector<VkSemaphore>& waits )
 {
 	VkPresentInfoKHR info = {};
 	info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -105,8 +107,7 @@ void Queue::present( const std::vector<VkSwapchainKHR>& swapchains, const std::v
 	info.pSwapchains = swapchains.data();
 	info.pImageIndices = image_indices.data();
 
-	auto ret = vkQueuePresentKHR( handle, &info );
-	assert( ret == VK_SUCCESS && "Cannot present queue" );
+	return vkQueuePresentKHR( handle, &info );
 }
 
 Device::Device( PhysicalDevice& d, const VkSurfaceKHR s, const RequiredExtensions required_extensions )
@@ -164,6 +165,13 @@ Queue& Device::find_queue( VkQueueFlagBits flags )
 		[flags]( auto& queue ) { return queue.flags & flags; });
 	assert( it != std::end( queues ) && "Cannot find graphics queue" );
 	return *it;
+}
+
+
+void Device::wait_idle() const
+{
+	auto res = vkDeviceWaitIdle( handle );
+	assert( res == VK_SUCCESS && "Cannot wait for device to be idle" );
 }
 
 
@@ -272,10 +280,22 @@ Fence::Fence( Fence&& other )
 }
 
 
+Fence& Fence::operator=( Fence&& other )
+{
+	assert( device.handle == other.device.handle
+		&& "Cannot move assign fence of another device" );
+	std::swap( handle, other.handle );
+	return *this;
+}
+
+
 void Fence::wait() const
 {
-	auto res = vkWaitForFences( device.handle, 1, &handle, VK_TRUE, std::numeric_limits<uint64_t>::max() );
-	assert( res == VK_SUCCESS && "Cannot wait for fence" );
+	if ( can_wait )
+	{
+		auto res = vkWaitForFences( device.handle, 1, &handle, VK_TRUE, std::numeric_limits<uint64_t>::max() );
+		assert( res == VK_SUCCESS && "Cannot wait for fence" );
+	}
 }
 
 
@@ -431,6 +451,12 @@ VkPresentModeKHR choose_present_mode( const std::vector<VkPresentModeKHR>& prese
 Swapchain::Swapchain( Device& d )
 : device { d }
 {
+	create();
+}
+
+
+void Swapchain::create()
+{
 	VkSwapchainCreateInfoKHR info = {};
 	info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	info.surface = device.surface;
@@ -463,16 +489,19 @@ Swapchain::Swapchain( Device& d )
 	info.presentMode = choose_present_mode( present_modes );
 	info.clipped = VK_TRUE;
 
-	info.oldSwapchain = VK_NULL_HANDLE;
+	info.oldSwapchain = handle;
 
 	auto ret = vkCreateSwapchainKHR( device.handle, &info, nullptr, &handle );
 	assert( ret == VK_SUCCESS && "Cannot create swapchain" );
 
 	uint32_t image_count;
 	vkGetSwapchainImagesKHR( device.handle, handle, &image_count, nullptr );
+
+	assert( images.size() == 0 && "Images should not be there" );
 	images.resize( image_count );
 	vkGetSwapchainImagesKHR( device.handle, handle, &image_count, images.data() );
 
+	assert( views.size() == 0 && "Views should not be there" );
 	views.resize( image_count );
 	for ( size_t i = 0; i < image_count; ++i )
 	{
@@ -492,13 +521,20 @@ Swapchain::Swapchain( Device& d )
 	}
 }
 
-
-Swapchain::~Swapchain()
+void Swapchain::destroy_views()
 {
 	for ( auto view : views )
 	{
 		vkDestroyImageView( device.handle, view, nullptr );
 	}
+	views.clear();
+	images.clear();
+}
+
+
+Swapchain::~Swapchain()
+{
+	destroy_views();
 
 	if ( handle != VK_NULL_HANDLE )
 	{
@@ -515,6 +551,14 @@ std::vector<Framebuffer> Swapchain::create_framebuffers( RenderPass& render_pass
 		framebuffers.emplace_back( view, extent, render_pass );
 	}
 	return framebuffers;
+}
+
+
+void Swapchain::recreate()
+{
+	device.wait_idle();
+	destroy_views();
+	create();
 }
 
 
@@ -579,12 +623,22 @@ RenderPass::RenderPass( Swapchain& s )
 	assert( ret == VK_SUCCESS && "Cannot create render pass" );
 }
 
+
 RenderPass::~RenderPass()
 {
 	if ( handle != VK_NULL_HANDLE )
 	{
 		vkDestroyRenderPass( device.handle, handle, nullptr );
 	}
+}
+
+
+RenderPass& RenderPass::operator=( RenderPass&& other )
+{
+	assert( device.handle == other.device.handle &&
+		"Cannot move assign render pass of another device" );
+	std::swap( handle, other.handle );
+	return *this;
 }
 
 
@@ -667,11 +721,8 @@ PipelineLayout::~PipelineLayout()
 }
 
 
-GraphicsPipeline::GraphicsPipeline( ShaderModule&& vv, ShaderModule&& ff, RenderPass& render_pass )
-: device { vv.device }
-, vert { std::move( vv ) }
-, frag { std::move( ff ) }
-, pipeline_layout( device )
+GraphicsPipeline::GraphicsPipeline( PipelineLayout& layout, ShaderModule& vert, ShaderModule& frag, RenderPass& render_pass )
+: device { vert.device }
 {
 	VkPipelineVertexInputStateCreateInfo input_info = {};
 	input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -786,7 +837,7 @@ GraphicsPipeline::GraphicsPipeline( ShaderModule&& vv, ShaderModule&& ff, Render
 	pipeline_info.pColorBlendState = &color_blending;
 	pipeline_info.pDynamicState = nullptr; // Optional
 
-	pipeline_info.layout = pipeline_layout.handle;
+	pipeline_info.layout = layout.handle;
 
 	pipeline_info.renderPass = render_pass.handle;
 	pipeline_info.subpass = 0;
@@ -803,6 +854,16 @@ GraphicsPipeline::~GraphicsPipeline()
 		vkDestroyPipeline( device.handle, handle, nullptr );
 	}
 }
+
+
+GraphicsPipeline& GraphicsPipeline::operator=( GraphicsPipeline&& other )
+{
+	assert( device.handle == other.device.handle &&
+		"Cannot move assign graphics pipeline of another device" );
+	std::swap( handle, other.handle );
+	return *this;
+}
+
 
 ValidationLayers get_validation_layers()
 {
@@ -823,10 +884,10 @@ Graphics::Graphics()
 , device { instance.physical_devices.at( 0 ), surface.handle, device_required_extensions }
 , swapchain { device }
 , render_pass { swapchain }
-, pipeline {
-	create_shader( "vert.spv" ),
-	create_shader( "frag.spv" ),
-	render_pass }
+, vert { device, "vert.spv" }
+, frag { device, "frag.spv" }
+, layout { device }
+, pipeline { layout, vert, frag, render_pass }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
 , framebuffers { swapchain.create_framebuffers( render_pass ) }
@@ -842,12 +903,6 @@ Graphics::Graphics()
 }
 
 
-ShaderModule Graphics::create_shader( const std::filesystem::path& path )
-{
-	return { device, path };
-}
-
-
 void Graphics::draw()
 {
 	auto& frame_in_flight = frames_in_flight[current_frame_index];
@@ -857,12 +912,29 @@ void Graphics::draw()
 	auto& image_available = images_available[current_frame_index];
 
 	uint32_t image_index;
-	vkAcquireNextImageKHR( device.handle,
+	auto res = vkAcquireNextImageKHR( device.handle,
 		swapchain.handle,
 		std::numeric_limits<uint64_t>::max(),
 		image_available.handle,
 		VK_NULL_HANDLE,
 		&image_index );
+	if ( res == VK_ERROR_OUT_OF_DATE_KHR )
+	{
+		swapchain.recreate();
+		render_pass = RenderPass( swapchain );
+		pipeline = GraphicsPipeline( layout, vert, frag, render_pass );
+		framebuffers = swapchain.create_framebuffers( render_pass );
+		for ( auto& fence : frames_in_flight )
+		{
+			fence.can_wait = false;
+		}
+
+		return; // then skip frame
+	}
+	else
+	{
+		assert( ( res == VK_SUCCESS || res == VK_SUBOPTIMAL_KHR ) && "Cannot present" );
+	}
 
 	auto& command_buffer = command_buffers[image_index];
 	auto& framebuffer = framebuffers[image_index];

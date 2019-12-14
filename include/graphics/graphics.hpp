@@ -58,13 +58,15 @@ class Fence
 	Fence( Device& d );
 	~Fence();
 
-	Fence( Fence&& other );
+	Fence( Fence&& o );
+	Fence& operator=( Fence&& o );
 
 	void wait() const;
 	void reset() const;
 
 	Device& device;
 	VkFence handle = VK_NULL_HANDLE;
+	bool can_wait = true;
 };
 
 
@@ -75,9 +77,9 @@ class Queue
 
 	bool supports_present( VkSurfaceKHR s );
 
-	void submit( CommandBuffer& command_buffer, const std::vector<VkSemaphore>& waits, const std::vector<VkSemaphore>& signals = {}, const Fence* fence = nullptr );
+	void submit( CommandBuffer& command_buffer, const std::vector<VkSemaphore>& waits, const std::vector<VkSemaphore>& signals = {}, Fence* fence = nullptr );
 
-	void present( const std::vector<VkSwapchainKHR>& swapchains, const std::vector<uint32_t>& image_index, const std::vector<VkSemaphore>& waits = {} );
+	VkResult present( const std::vector<VkSwapchainKHR>& swapchains, const std::vector<uint32_t>& image_index, const std::vector<VkSemaphore>& waits = {} );
 
 	const Device& device;
 	uint32_t family_index = 0;
@@ -95,6 +97,7 @@ class Device
 	Device( PhysicalDevice& p, VkSurfaceKHR s, RequiredExtensions required_extensions = {} );
 	~Device();
 
+	void wait_idle() const;
 	Queue& find_queue( VkQueueFlagBits flags );
 	Queue& find_graphics_queue();
 	Queue& find_present_queue( VkSurfaceKHR surface );
@@ -126,6 +129,8 @@ class RenderPass
 	RenderPass( Swapchain& s );
 	~RenderPass();
 
+	RenderPass& operator=( RenderPass&& o );
+
 	Device& device;
 	VkRenderPass handle = VK_NULL_HANDLE;
 };
@@ -154,6 +159,8 @@ class Swapchain
 
 	std::vector<Framebuffer> create_framebuffers( RenderPass& render_pass );
 
+	void recreate();
+
 	Device& device;
 	VkSwapchainKHR handle = VK_NULL_HANDLE;
 
@@ -162,6 +169,11 @@ class Swapchain
 
 	std::vector<VkImage> images;
 	std::vector<VkImageView> views;
+
+  private:
+	void create();
+
+	void destroy_views();
 };
 
 
@@ -227,24 +239,19 @@ class PipelineLayout
 class GraphicsPipeline
 {
   public:
-	GraphicsPipeline( ShaderModule&& vert, ShaderModule&& frag, RenderPass& render_pass );
+	GraphicsPipeline( PipelineLayout& layout, ShaderModule& vert, ShaderModule& frag, RenderPass& render_pass );
 	~GraphicsPipeline();
+
+	GraphicsPipeline& operator=( GraphicsPipeline&& o );
 
 	Device& device;
 	VkPipeline handle = VK_NULL_HANDLE;
-
-	ShaderModule vert;
-	ShaderModule frag;
-
-	PipelineLayout pipeline_layout;
 };
 
 class Graphics
 {
   public:
 	Graphics();
-
-	ShaderModule create_shader( const std::filesystem::path& path );
 
 	void draw();
 
@@ -258,6 +265,10 @@ class Graphics
 	Swapchain swapchain;
 
 	RenderPass render_pass;
+
+	ShaderModule vert;
+	ShaderModule frag;
+	PipelineLayout layout;
 	GraphicsPipeline pipeline;
 
 	CommandPool command_pool;
