@@ -48,6 +48,8 @@ class String
 	String( const char* str, size_t length, size_t minCapacity = kDefaultCapacity );
 	String( const String& other, size_t minCapacity = kDefaultCapacity );
 
+	String& operator=( const String& other );
+
 	size_t get_length() const { return m_Length; }
 	const char* get_c_str() const { return reinterpret_cast<const char*>( m_Buffer ); }
 	char* get_mut_c_str() { return reinterpret_cast<char*>( m_Buffer ); }

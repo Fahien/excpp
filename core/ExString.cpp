@@ -1,4 +1,6 @@
 #include <cstring>
+#include <cassert>
+#include <algorithm>
 
 #include "ExString.h"
 
@@ -126,6 +128,22 @@ String::String( const String& other, size_t minCapacity )
 }
 
 
+String& String::operator=( const String& other )
+{
+	if (m_Capacity < other.m_Capacity )
+	{
+		m_Capacity = other.m_Capacity;
+		std::allocator_traits<std::allocator<uint8_t>>::destroy( m_Allocator, m_Buffer );
+		m_Buffer = m_Allocator.allocate( m_Capacity );
+	}
+
+	m_Length = other.m_Length;
+	std::copy( other.m_Buffer, other.m_Buffer + m_Length, m_Buffer );
+
+	return *this;
+}
+
+
 void String::concat( const char* rhs, const size_t rhsLength )
 {
 	auto capacity = m_Capacity;
@@ -235,14 +253,14 @@ String operator+( const StringView& lhs, const String& rhs )
 
 std::ostream &operator<<(std::ostream& os, const String &str)
 {
-	std::for_each_n( str.get_c_str(), str.get_length(), [&os]( const char c ) { os << c; } );
+	std::for_each( str.get_c_str(), str.get_c_str() + str.get_length(), [&os]( const char c ) { os << c; } );
 	return os;
 }
 
 
 std::ostream &operator<<(std::ostream& os, const StringView &str)
 {
-	std::for_each_n( str.get_c_str(), str.get_length(), [&os]( const char c ) { os << c; } );
+	std::for_each( str.get_c_str(), str.get_c_str() + str.get_length(), [&os]( const char c ) { os << c; } );
 	return os;
 }
 

@@ -4,6 +4,7 @@
 
 #include "Common.h"
 #include <memory>
+#include <algorithm>
 
 #include "Result.h"
 

@@ -17,5 +17,8 @@ int main()
 	assert( hello_world == String{ "Hello, world" } && "Content is not \"Hello, world\"" );
 	assert( hello_world == "Hello, world"_str && "Content is not \"Hello, world\"" );
 
+	hello_world = hello;
+	assert( hello_world == "Hello" && "Content is not \"Hello\"" );
+
 	return EXIT_SUCCESS;
 }

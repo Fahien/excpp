@@ -1,8 +1,7 @@
 #include <string>
+#include <cstring>
 
 #include "IoEx.h"
-
-using namespace std;
 
 
 FILE* excpp::fopenEx(const std::string& name, const std::string& mode)
