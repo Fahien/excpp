@@ -16,7 +16,7 @@ function( add_exercise CHAPTER EXERCISE )
 	add_executable( ${EXERCISE} ${EXECUTABLE} )
 endfunction( add_exercise )
 
-add_exercise( statements Forwhile )
+add_exercise( statements ForWhile )
 add_exercise( statements Atoi )
 add_exercise( statements Itoa )
 add_exercise( statements StripComments )

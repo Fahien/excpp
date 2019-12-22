@@ -1,4 +1,6 @@
 #include <cstring>
+#include <cassert>
+#include <algorithm>
 
 #include "ExString.h"
 
