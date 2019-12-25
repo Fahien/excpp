@@ -7,6 +7,27 @@
 namespace graphics
 {
 
+template <>
+VkVertexInputBindingDescription get_bindings<Point>()
+{
+	VkVertexInputBindingDescription bindings = {};
+	bindings.binding = 0;
+	bindings.stride = sizeof(Point);
+	bindings.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	return bindings;
+}
+
+
+template <>
+VkVertexInputAttributeDescription get_attributes<Point>()
+{
+	VkVertexInputAttributeDescription attributes = {};
+	attributes.binding = 0;
+	attributes.location = 0;
+	attributes.format = VK_FORMAT_R32G32_SFLOAT;
+	attributes.offset = offsetof(Point, x);
+	return attributes;
+}
 
 PhysicalDevice::PhysicalDevice( VkPhysicalDevice h )
 : handle { h }
@@ -50,6 +71,25 @@ std::vector<VkPresentModeKHR> PhysicalDevice::get_present_modes( VkSurfaceKHR s 
 	std::vector<VkPresentModeKHR> modes( mode_count );
 	vkGetPhysicalDeviceSurfacePresentModesKHR( handle, s, &mode_count, modes.data() );
 	return modes;
+}
+
+
+uint32_t PhysicalDevice::get_memory_type( uint32_t type_filter, VkMemoryPropertyFlags flags )
+{
+	VkPhysicalDeviceMemoryProperties properties;
+	vkGetPhysicalDeviceMemoryProperties( handle, &properties );
+
+	for ( uint32_t i = 0; i < properties.memoryTypeCount; ++i )
+	{
+		if ( ( type_filter & ( 1 << i ) ) &&
+		     ( ( properties.memoryTypes[i].propertyFlags & flags ) == flags ) )
+		{
+			return i;
+		}
+	}
+
+	assert( false && "Cannot find memory type" );
+	return 0;
 }
 
 
@@ -299,10 +339,57 @@ void Fence::wait() const
 }
 
 
-void Fence::reset() const
+void Fence::reset()
 {
 	auto res = vkResetFences( device.handle, 1, &handle );
 	assert( res == VK_SUCCESS && "Cannot reset fence" );
+	can_wait = false;
+}
+
+
+Buffer::Buffer( Device& d, const VkDeviceSize size, const VkBufferUsageFlags usage )
+: device { d }
+{
+	VkBufferCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	info.size = size;
+	info.usage = usage;
+
+	// Not share between multiple queues at the same time
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	auto res = vkCreateBuffer( device.handle, &info, nullptr, &handle );
+	assert( res == VK_SUCCESS && "Cannot create buffer" );
+
+	VkMemoryRequirements requirements;
+	vkGetBufferMemoryRequirements( device.handle, handle, &requirements );
+
+	VkMemoryAllocateInfo meminfo = {};
+	meminfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	meminfo.allocationSize = requirements.size;
+	auto memory_type = device.physical_device.get_memory_type( requirements.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	meminfo.memoryTypeIndex = memory_type;
+
+	res = vkAllocateMemory( device.handle, &meminfo, nullptr, &memory );
+	assert( res == VK_SUCCESS && "Cannot allocate memory" );
+
+	res = vkBindBufferMemory( device.handle, handle, memory, /* offset */ 0 );
+	assert( res == VK_SUCCESS && "Cannot bind memory to buffer" );
+}
+
+
+Buffer::~Buffer()
+{
+	if ( handle != VK_NULL_HANDLE )
+	{
+		vkDestroyBuffer( device.handle, handle, nullptr );
+	}
+
+	if ( memory != VK_NULL_HANDLE )
+	{
+		vkFreeMemory( device.handle, memory, nullptr );
+	}
 }
 
 
@@ -346,7 +433,7 @@ void CommandBuffer::bind( GraphicsPipeline& pipeline )
 
 void CommandBuffer::draw()
 {
-	vkCmdDraw( handle, 3, 1, 0, 0 );
+	vkCmdDraw( handle, 4, 1, 0, 0 );
 }
 
 
@@ -726,14 +813,16 @@ GraphicsPipeline::GraphicsPipeline( PipelineLayout& layout, ShaderModule& vert, 
 {
 	VkPipelineVertexInputStateCreateInfo input_info = {};
 	input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	input_info.vertexBindingDescriptionCount = 0;
-	input_info.pVertexBindingDescriptions = nullptr;
-	input_info.vertexAttributeDescriptionCount = 0;
-	input_info.pVertexAttributeDescriptions = nullptr;
+	input_info.vertexBindingDescriptionCount = 1;
+	auto bindings = get_bindings<Point>();
+	input_info.pVertexBindingDescriptions = &bindings;
+	input_info.vertexAttributeDescriptionCount = 1;
+	auto attributes = get_attributes<Point>();
+	input_info.pVertexAttributeDescriptions = &attributes;
 
 	VkPipelineInputAssemblyStateCreateInfo assembly_info = {};
 	assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 	assembly_info.primitiveRestartEnable = VK_FALSE;
 
 	std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {};
@@ -888,6 +977,7 @@ Graphics::Graphics()
 , frag { device, "frag.spv" }
 , layout { device }
 , pipeline { layout, vert, frag, render_pass }
+, vertex_buffer { device, 0, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
 , framebuffers { swapchain.create_framebuffers( render_pass ) }

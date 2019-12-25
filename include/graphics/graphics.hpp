@@ -12,6 +12,19 @@ namespace graphics
 {
 
 
+struct Point
+{
+	float x;
+	float y;
+};
+
+template<typename T>
+VkVertexInputBindingDescription get_bindings();
+
+template<typename T>
+VkVertexInputAttributeDescription get_attributes();
+
+
 struct ValidationLayers
 {
 	uint32_t count = 0;
@@ -27,6 +40,7 @@ class PhysicalDevice
 	VkSurfaceCapabilitiesKHR get_capabilities( VkSurfaceKHR s );
 	std::vector<VkSurfaceFormatKHR> get_formats( VkSurfaceKHR s );
 	std::vector<VkPresentModeKHR> get_present_modes( VkSurfaceKHR s );
+	uint32_t get_memory_type( uint32_t type_filter, VkMemoryPropertyFlags f );
 
 	VkPhysicalDevice handle = VK_NULL_HANDLE;
 	VkPhysicalDeviceProperties properties;
@@ -62,7 +76,7 @@ class Fence
 	Fence& operator=( Fence&& o );
 
 	void wait() const;
-	void reset() const;
+	void reset();
 
 	Device& device;
 	VkFence handle = VK_NULL_HANDLE;
@@ -90,6 +104,7 @@ class Queue
 
 
 class Swapchain;
+
 
 class Device
 {
@@ -177,7 +192,20 @@ class Swapchain
 };
 
 
+class Buffer
+{
+  public:
+	Buffer( Device& d, VkDeviceSize size, VkBufferUsageFlags usage );
+	~Buffer();
+
+	Device& device;
+	VkBuffer handle = VK_NULL_HANDLE;
+	VkDeviceMemory memory = VK_NULL_HANDLE;
+};
+
+
 class GraphicsPipeline;
+
 
 class CommandBuffer
 {
@@ -226,6 +254,7 @@ class ShaderModule
 	VkShaderModule handle = VK_NULL_HANDLE;
 };
 
+
 class PipelineLayout
 {
   public:
@@ -235,6 +264,7 @@ class PipelineLayout
 	Device& device;
 	VkPipelineLayout handle = VK_NULL_HANDLE;
 };
+
 
 class GraphicsPipeline
 {
@@ -247,6 +277,7 @@ class GraphicsPipeline
 	Device& device;
 	VkPipeline handle = VK_NULL_HANDLE;
 };
+
 
 class Graphics
 {
@@ -271,6 +302,8 @@ class Graphics
 	PipelineLayout layout;
 	GraphicsPipeline pipeline;
 
+	Buffer vertex_buffer;
+
 	CommandPool command_pool;
 	std::vector<CommandBuffer> command_buffers;
 
@@ -285,5 +318,6 @@ class Graphics
 	Queue& graphics_queue;
 	Queue& present_queue;
 };
+
 
 }
