@@ -6,12 +6,18 @@
 
 int main()
 {
-	auto graphics = graphics::Graphics();
+	using namespace graphics;
+	auto graphics = Graphics();
 	
 	while ( graphics.window.is_alive() )
 	{
 		graphics.glfw.poll();
-		graphics.draw();
+		if ( graphics.render_begin() )
+		{
+			//graphics.draw();
+			graphics.draw( Point( -0.5f, -0.5f ) );
+			graphics.render_end();
+		}
 	}
 
 	return EXIT_SUCCESS;

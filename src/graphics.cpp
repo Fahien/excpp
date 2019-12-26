@@ -3,6 +3,9 @@
 #include <array>
 #include <filesystem>
 #include <limits>
+#include <algorithm>
+#include <cassert>
+#include <cstring>
 
 namespace graphics
 {
@@ -238,10 +241,11 @@ Instance::Instance( RequiredExtensions req_ext, ValidationLayers layers )
 	info.ppEnabledExtensionNames = req_ext.names;
 	info.enabledLayerCount = layers.count;
 	info.ppEnabledLayerNames = layers.names;
-	vkCreateInstance( &info, nullptr, &handle );
+	auto res = vkCreateInstance( &info, nullptr, &handle );
+	assert( res == VK_SUCCESS && "Cannot create Vulkan instance" );
 
 	uint32_t ph_dev_count;
-	vkEnumeratePhysicalDevices( handle, &ph_dev_count, nullptr);
+	vkEnumeratePhysicalDevices( handle, &ph_dev_count, nullptr );
 
 	std::vector<VkPhysicalDevice> ph_devs( ph_dev_count );
 	vkEnumeratePhysicalDevices( handle, &ph_dev_count, ph_devs.data() );
@@ -393,6 +397,15 @@ Buffer::~Buffer()
 }
 
 
+void Buffer::upload( const uint8_t* data, const VkDeviceSize size )
+{
+	void* temp;
+	vkMapMemory( device.handle, memory, 0, size, 0, &temp);
+	std::memcpy( temp, data, size );
+	vkUnmapMemory( device.handle, memory );
+}
+
+
 CommandBuffer::CommandBuffer( const VkCommandBuffer h )
 : handle { h }
 {}
@@ -431,9 +444,16 @@ void CommandBuffer::bind( GraphicsPipeline& pipeline )
 }
 
 
+void CommandBuffer::bind_vertex_buffer( Buffer& buffer )
+{
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers( handle, 0, 1, &buffer.handle, offsets );
+}
+
+
 void CommandBuffer::draw()
 {
-	vkCmdDraw( handle, 4, 1, 0, 0 );
+	vkCmdDraw( handle, 1, 1, 0, 0 );
 }
 
 
@@ -822,7 +842,7 @@ GraphicsPipeline::GraphicsPipeline( PipelineLayout& layout, ShaderModule& vert, 
 
 	VkPipelineInputAssemblyStateCreateInfo assembly_info = {};
 	assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+	assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 	assembly_info.primitiveRestartEnable = VK_FALSE;
 
 	std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {};
@@ -975,9 +995,11 @@ Graphics::Graphics()
 , render_pass { swapchain }
 , vert { device, "vert.spv" }
 , frag { device, "frag.spv" }
+//, point_vert { device, "point.vert.spv" }
+//, point_frag { device, "point.frag.spv" }
 , layout { device }
 , pipeline { layout, vert, frag, render_pass }
-, vertex_buffer { device, 0, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT }
+, vertex_buffer { device, sizeof( Point ), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
 , framebuffers { swapchain.create_framebuffers( render_pass ) }
@@ -993,19 +1015,19 @@ Graphics::Graphics()
 }
 
 
-void Graphics::draw()
+bool Graphics::render_begin()
 {
-	auto& frame_in_flight = frames_in_flight[current_frame_index];
-	frame_in_flight.wait();
-	frame_in_flight.reset();
+	current_frame_in_flight = &frames_in_flight[current_frame_index];
+	current_frame_in_flight->wait();
+	current_frame_in_flight->reset();
 
-	auto& image_available = images_available[current_frame_index];
+	current_image_available = &images_available[current_frame_index];
 
 	uint32_t image_index;
 	auto res = vkAcquireNextImageKHR( device.handle,
 		swapchain.handle,
 		std::numeric_limits<uint64_t>::max(),
-		image_available.handle,
+		current_image_available->handle,
 		VK_NULL_HANDLE,
 		&image_index );
 	if ( res == VK_ERROR_OUT_OF_DATE_KHR )
@@ -1019,30 +1041,52 @@ void Graphics::draw()
 			fence.can_wait = false;
 		}
 
-		return; // then skip frame
+		return false; // then skip frame
 	}
 	else
 	{
 		assert( ( res == VK_SUCCESS || res == VK_SUBOPTIMAL_KHR ) && "Cannot present" );
 	}
+	current_frame_index = image_index;
 
-	auto& command_buffer = command_buffers[image_index];
-	auto& framebuffer = framebuffers[image_index];
+	current_command_buffer = &command_buffers[image_index];
+	current_framebuffer = &framebuffers[image_index];
 
-	command_buffer.begin();
-	command_buffer.begin_render_pass( render_pass, framebuffer );
-	command_buffer.bind( pipeline );
-	command_buffer.draw();
-	command_buffer.end_render_pass();
-	command_buffer.end();
+	current_command_buffer->begin();
 
-	auto& image_drawn = images_drawn[image_index];
-
-	graphics_queue.submit( command_buffer, { image_available.handle }, { image_drawn.handle }, &frame_in_flight );
-
-	present_queue.present( { swapchain.handle }, { image_index }, { image_drawn.handle } );
-
-	current_frame_index = ( current_frame_index + 1 ) % frames_in_flight.size();
+	return true;
 }
+
+void Graphics::render_end()
+{
+	current_command_buffer->end();
+
+	auto& image_drawn = images_drawn[current_frame_index];
+
+	graphics_queue.submit( *current_command_buffer, { current_image_available->handle }, { image_drawn.handle }, current_frame_in_flight );
+
+	present_queue.present( { swapchain.handle }, { current_frame_index }, { image_drawn.handle } );
+}
+
+
+void Graphics::draw()
+{
+	current_command_buffer->begin_render_pass( render_pass, *current_framebuffer );
+	current_command_buffer->bind( pipeline );
+	current_command_buffer->draw();
+	current_command_buffer->end_render_pass();
+}
+
+
+void Graphics::draw( const Point& point )
+{
+	vertex_buffer.upload( reinterpret_cast<const uint8_t*>( &point ), sizeof( Point ) );
+	current_command_buffer->begin_render_pass( render_pass, *current_framebuffer );
+	current_command_buffer->bind( pipeline );
+	current_command_buffer->bind_vertex_buffer( vertex_buffer );
+	current_command_buffer->draw();
+	current_command_buffer->end_render_pass();
+}
+
 
 } // namespace graphics

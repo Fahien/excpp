@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <filesystem>
+#include <functional>
 
 #include <vulkan/vulkan_core.h>
 
@@ -14,9 +15,12 @@ namespace graphics
 
 struct Point
 {
-	float x;
-	float y;
+	Point( float xx = 0.0f, float yy = 0.0f ): x { xx }, y { yy } {}
+
+	float x = 0.0f;
+	float y = 0.0f;
 };
+
 
 template<typename T>
 VkVertexInputBindingDescription get_bindings();
@@ -198,6 +202,8 @@ class Buffer
 	Buffer( Device& d, VkDeviceSize size, VkBufferUsageFlags usage );
 	~Buffer();
 
+	void upload( const uint8_t* data, VkDeviceSize size );
+
 	Device& device;
 	VkBuffer handle = VK_NULL_HANDLE;
 	VkDeviceMemory memory = VK_NULL_HANDLE;
@@ -214,9 +220,11 @@ class CommandBuffer
 
 	void begin();
 
-	void begin_render_pass( RenderPass& render_pass, Framebuffer& framebuffer );
+	void begin_render_pass( RenderPass& rp, Framebuffer& fb );
 
-	void bind( GraphicsPipeline& pipeline );
+	void bind_vertex_buffer( Buffer& b );
+
+	void bind( GraphicsPipeline& p );
 
 	void draw();
 
@@ -284,7 +292,11 @@ class Graphics
   public:
 	Graphics();
 
+	bool render_begin();
+	void render_end();
+
 	void draw();
+	void draw( const Point& p );
 
 	Glfw glfw;
 	Instance instance;
@@ -306,14 +318,19 @@ class Graphics
 
 	CommandPool command_pool;
 	std::vector<CommandBuffer> command_buffers;
+	CommandBuffer* current_command_buffer = nullptr;
 
 	std::vector<Framebuffer> framebuffers;
+	Framebuffer* current_framebuffer = nullptr;
 
 	uint32_t current_frame_index = 0;
 
 	std::vector<Semaphore> images_available;
+	Semaphore* current_image_available = nullptr;
+
 	std::vector<Semaphore> images_drawn;
 	std::vector<Fence> frames_in_flight;
+	Fence* current_frame_in_flight = nullptr;
 
 	Queue& graphics_queue;
 	Queue& present_queue;
