@@ -32,10 +32,22 @@ void Glfw::poll()
 }
 
 
+void set_window_size( GLFWwindow* handle, const int width, const int height )
+{
+	auto window = reinterpret_cast<Glfw::Window*>( glfwGetWindowUserPointer( handle ) );
+	window->extent.width  = width;
+	window->extent.height = height;
+}
+
+
 Glfw::Window::Window()
 {
 	glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
-	handle = glfwCreateWindow( 640, 480, "Graphics", nullptr, nullptr );
+	handle = glfwCreateWindow( extent.width, extent.height, "Graphics", nullptr, nullptr );
+
+	// Resize callback
+	glfwSetWindowUserPointer( handle, this );
+	glfwSetWindowSizeCallback( handle, set_window_size );
 }
 
 

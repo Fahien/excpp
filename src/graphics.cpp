@@ -294,6 +294,14 @@ Semaphore::Semaphore( Semaphore&& other )
 }
 
 
+Semaphore& Semaphore::operator=( Semaphore&& other )
+{
+	assert( &device == &other.device && "Cannot move semaphore from different device" );
+	std::swap(handle, other.handle);
+	return *this;
+}
+
+
 Fence::Fence( Device& d )
 : device { d }
 {
@@ -406,6 +414,130 @@ void Buffer::upload( const uint8_t* data, const VkDeviceSize size )
 }
 
 
+void VertexBuffers::create_buffers( const uint32_t count )
+{
+	assert( count > 0 && "Cannot create 0 buffers" );
+
+	if (count > handles.size())
+	{
+		clear();
+
+		VkBufferCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		info.size = count * size;
+		info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		// Not share between multiple queues at the same time
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		// Make space for handles
+		handles.resize( 1 );
+		offsets.resize( 1 );
+
+		for ( uint32_t i = 0; i < 1; ++i )
+		{
+			offsets[i] = size * i;
+			auto res = vkCreateBuffer( device.handle, &info, nullptr, &handles[i] );
+			assert( res == VK_SUCCESS && "Cannot create buffer" );
+		}
+
+		VkMemoryRequirements requirements;
+		vkGetBufferMemoryRequirements( device.handle, handles[0], &requirements );
+
+		VkMemoryAllocateInfo meminfo = {};
+		meminfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		// Allocate enough memory for each buffer
+		meminfo.allocationSize = requirements.size * count;
+		auto memory_type = device.physical_device.get_memory_type( requirements.memoryTypeBits,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+		meminfo.memoryTypeIndex = memory_type;
+
+		if ( memory != VK_NULL_HANDLE )
+		{
+			// Release previous memory
+			vkFreeMemory( device.handle, memory, nullptr );
+		}
+
+		auto res = vkAllocateMemory( device.handle, &meminfo, nullptr, &memory );
+		assert( res == VK_SUCCESS && "Cannot allocate memory" );
+
+		//for ( uint32_t i = 0; i < count; ++i )
+		//{
+			//uint32_t offset = i * size;
+			//printf( "Binding mem %u offset %u\n", i, offset );
+			res = vkBindBufferMemory( device.handle, handles[0], memory, 0 );
+			assert( res == VK_SUCCESS && "Cannot bind memory to buffer" );
+		//}
+	}
+}
+
+VertexBuffers::VertexBuffers( Device& d, const VkDeviceSize ds, const uint32_t count )
+: device { d }
+, size { ds }
+{
+	create_buffers( count );
+}
+
+void VertexBuffers::clear()
+{
+	for ( auto handle : handles )
+	{
+		vkDestroyBuffer( device.handle, handle, nullptr );
+		handles.clear();
+	}
+
+	if ( memory != VK_NULL_HANDLE )
+	{
+		vkFreeMemory( device.handle, memory, nullptr );
+		memory = VK_NULL_HANDLE;
+	}
+}
+
+
+VertexBuffers::~VertexBuffers()
+{
+	clear();
+}
+
+
+VertexBuffers::VertexBuffers( VertexBuffers&& other )
+: device { other.device }
+, vertex_count { other.vertex_count }
+, size { other.size }
+, handles { std::move( other.handles ) }
+, offsets { std::move( other.offsets ) }
+, memory { other.memory }
+{
+	other.memory = VK_NULL_HANDLE;
+}
+
+
+void VertexBuffers::set_vertex_count( const uint32_t count )
+{
+	create_buffers( count );
+	vertex_count = count;
+}
+
+
+void VertexBuffers::upload( const uint8_t* data, const uint32_t index )
+{
+	assert( index < vertex_count && "Cannot upload vertex out of bounds" );
+	void* temp;
+	VkDeviceSize offset = size * index;
+	vkMapMemory( device.handle, memory, offset, size, 0, &temp);
+	std::memcpy( temp, data, size );
+	vkUnmapMemory( device.handle, memory );
+}
+
+
+void VertexBuffers::upload( const uint8_t* data )
+{
+	void* temp;
+	vkMapMemory( device.handle, memory, 0, size * vertex_count, 0, &temp);
+	std::memcpy( temp, data, size * vertex_count );
+	vkUnmapMemory( device.handle, memory );
+}
+
+
 CommandBuffer::CommandBuffer( const VkCommandBuffer h )
 : handle { h }
 {}
@@ -430,7 +562,7 @@ void CommandBuffer::begin_render_pass( RenderPass& render_pass, Framebuffer& fra
 	info.renderArea.offset = { 0, 0 };
 	info.renderArea.extent = framebuffer.extent;
 
-	VkClearValue clear = { 0.0f, 0.0f, 0.0f, 1.0f };
+	VkClearValue clear = { 0.0f, 0.2f, 0.3f, 1.0f };
 	info.clearValueCount = 1;
 	info.pClearValues = &clear;
 
@@ -438,9 +570,21 @@ void CommandBuffer::begin_render_pass( RenderPass& render_pass, Framebuffer& fra
 }
 
 
-void CommandBuffer::bind( GraphicsPipeline& pipeline )
+void CommandBuffer::bind( GraphicsPipeline& line_pipeline )
 {
-	vkCmdBindPipeline( handle, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.handle );
+	vkCmdBindPipeline( handle, VK_PIPELINE_BIND_POINT_GRAPHICS, line_pipeline.handle );
+}
+
+
+void CommandBuffer::set_viewport( const VkViewport& viewport )
+{
+	vkCmdSetViewport( handle, 0, 1, &viewport );
+}
+
+
+void CommandBuffer::set_scissor( const VkRect2D& scissor )
+{
+	vkCmdSetScissor( handle, 0, 1, &scissor );
 }
 
 
@@ -451,9 +595,19 @@ void CommandBuffer::bind_vertex_buffer( Buffer& buffer )
 }
 
 
-void CommandBuffer::draw()
+void CommandBuffer::bind_vertex_buffers( VertexBuffers& buffers )
 {
-	vkCmdDraw( handle, 1, 1, 0, 0 );
+	vkCmdBindVertexBuffers( handle, 0,
+		1,
+		buffers.handles.data(),
+		buffers.offsets.data() );
+}
+
+
+void CommandBuffer::draw( const uint32_t vertex_count )
+{
+	assert( vertex_count > 0 && "Cannot draw 0 vertices" );
+	vkCmdDraw( handle, vertex_count, 1, 0, 0 );
 }
 
 
@@ -569,7 +723,9 @@ void Swapchain::create()
 	info.surface = device.surface;
 
 	auto capabilities = device.physical_device.get_capabilities( device.surface );
-	info.minImageCount = capabilities.minImageCount + 1;
+	info.minImageCount = 3;
+	assert( capabilities.maxImageCount == 0 || capabilities.maxImageCount > 2 &&
+		"Triple buffering is not supported");
 	if ( capabilities.maxImageCount > 0 && info.minImageCount > capabilities.maxImageCount )
 	{
 		info.minImageCount = capabilities.maxImageCount;
@@ -828,7 +984,14 @@ PipelineLayout::~PipelineLayout()
 }
 
 
-GraphicsPipeline::GraphicsPipeline( PipelineLayout& layout, ShaderModule& vert, ShaderModule& frag, RenderPass& render_pass )
+GraphicsPipeline::GraphicsPipeline(
+	PipelineLayout& layout,
+	ShaderModule& vert,
+	ShaderModule& frag,
+	RenderPass& render_pass,
+	const VkViewport& viewport,
+	const VkRect2D& scissor,
+	const VkPrimitiveTopology topology )
 : device { vert.device }
 {
 	VkPipelineVertexInputStateCreateInfo input_info = {};
@@ -842,7 +1005,7 @@ GraphicsPipeline::GraphicsPipeline( PipelineLayout& layout, ShaderModule& vert, 
 
 	VkPipelineInputAssemblyStateCreateInfo assembly_info = {};
 	assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+	assembly_info.topology = topology;
 	assembly_info.primitiveRestartEnable = VK_FALSE;
 
 	std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {};
@@ -858,19 +1021,6 @@ GraphicsPipeline::GraphicsPipeline( PipelineLayout& layout, ShaderModule& vert, 
 	frag_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	frag_info.module = frag.handle;
 	frag_info.pName = "main";
-
-	VkViewport viewport = {};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = 600.0f;
-	viewport.height = 600.0f;
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-
-	VkRect2D scissor = {};
-	scissor.offset = {0, 0};
-	scissor.extent.width = 600.0f;
-	scissor.extent.height = 600.0f;
 
 	VkPipelineViewportStateCreateInfo viewport_info = {};
 	viewport_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -952,7 +1102,7 @@ GraphicsPipeline::GraphicsPipeline( PipelineLayout& layout, ShaderModule& vert, 
 	pipeline_info.subpass = 0;
 
 	auto ret = vkCreateGraphicsPipelines( device.handle, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &handle );
-	assert( ret == VK_SUCCESS && "Cannote create graphics pipeline" );
+	assert( ret == VK_SUCCESS && "Cannote create graphics line_pipeline" );
 }
 
 
@@ -968,7 +1118,7 @@ GraphicsPipeline::~GraphicsPipeline()
 GraphicsPipeline& GraphicsPipeline::operator=( GraphicsPipeline&& other )
 {
 	assert( device.handle == other.device.handle &&
-		"Cannot move assign graphics pipeline of another device" );
+		"Cannot move assign graphics line_pipeline of another device" );
 	std::swap( handle, other.handle );
 	return *this;
 }
@@ -987,6 +1137,26 @@ ValidationLayers get_validation_layers()
 	return layers;
 }
 
+VkViewport create_viewport( const Glfw::Window& window )
+{
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = window.extent.width;
+	viewport.height = window.extent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	return viewport;
+}
+
+VkRect2D create_scissor( const Glfw::Window& window )
+{
+	VkRect2D scissor = {};
+	scissor.offset = {0, 0};
+	scissor.extent = window.extent;
+	return scissor;
+}
+
 Graphics::Graphics()
 : instance { glfw.required_extensions, get_validation_layers() }
 , surface { instance, window }
@@ -998,8 +1168,10 @@ Graphics::Graphics()
 //, point_vert { device, "point.vert.spv" }
 //, point_frag { device, "point.frag.spv" }
 , layout { device }
-, pipeline { layout, vert, frag, render_pass }
-, vertex_buffer { device, sizeof( Point ), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT }
+, viewport { create_viewport( window ) }
+, scissor { create_scissor( window ) }
+, line_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_LINE_LIST }
+, point_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
 , framebuffers { swapchain.create_framebuffers( render_pass ) }
@@ -1011,17 +1183,17 @@ Graphics::Graphics()
 		images_available.emplace_back( device );
 		images_drawn.emplace_back( device );
 		frames_in_flight.emplace_back( device );
+
+		point_vertex_buffers.emplace_back( device, sizeof( Point ) );
+		line_vertex_buffers.emplace_back( device, sizeof( Point ) );
 	}
 }
 
 
 bool Graphics::render_begin()
 {
-	current_frame_in_flight = &frames_in_flight[current_frame_index];
-	current_frame_in_flight->wait();
-	current_frame_in_flight->reset();
-
-	current_image_available = &images_available[current_frame_index];
+	std::rotate(std::begin(images_available), ++std::begin(images_available), std::end(images_available));
+	current_image_available = &images_available.back();
 
 	uint32_t image_index;
 	auto res = vkAcquireNextImageKHR( device.handle,
@@ -1030,12 +1202,26 @@ bool Graphics::render_begin()
 		current_image_available->handle,
 		VK_NULL_HANDLE,
 		&image_index );
-	if ( res == VK_ERROR_OUT_OF_DATE_KHR )
+	if ( res == VK_ERROR_OUT_OF_DATE_KHR ||
+		viewport.width != window.extent.width ||
+		viewport.height != window.extent.height )
 	{
+		// Recreate current semaphore
+		images_available.back() = Semaphore( device );
+
 		swapchain.recreate();
 		render_pass = RenderPass( swapchain );
-		pipeline = GraphicsPipeline( layout, vert, frag, render_pass );
+
+		// Update viewport and scissor
+		viewport.width = window.extent.width;
+		viewport.height = window.extent.height;
+		scissor.extent = window.extent;
+
+		point_pipeline = GraphicsPipeline( layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST );
+		line_pipeline  = GraphicsPipeline( layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_LINE_LIST );
+
 		framebuffers = swapchain.create_framebuffers( render_pass );
+
 		for ( auto& fence : frames_in_flight )
 		{
 			fence.can_wait = false;
@@ -1047,18 +1233,27 @@ bool Graphics::render_begin()
 	{
 		assert( ( res == VK_SUCCESS || res == VK_SUBOPTIMAL_KHR ) && "Cannot present" );
 	}
+
 	current_frame_index = image_index;
+	current_frame_in_flight = &frames_in_flight[current_frame_index];
+	current_frame_in_flight->wait();
+	current_frame_in_flight->reset();
 
 	current_command_buffer = &command_buffers[image_index];
 	current_framebuffer = &framebuffers[image_index];
 
+	current_point_vertex_buffer = &point_vertex_buffers[image_index];
+	current_line_vertex_buffer  = &line_vertex_buffers[image_index];
+
 	current_command_buffer->begin();
+	current_command_buffer->begin_render_pass( render_pass, *current_framebuffer );
 
 	return true;
 }
 
 void Graphics::render_end()
 {
+	current_command_buffer->end_render_pass();
 	current_command_buffer->end();
 
 	auto& image_drawn = images_drawn[current_frame_index];
@@ -1071,21 +1266,45 @@ void Graphics::render_end()
 
 void Graphics::draw()
 {
-	current_command_buffer->begin_render_pass( render_pass, *current_framebuffer );
-	current_command_buffer->bind( pipeline );
+	current_command_buffer->bind( line_pipeline );
 	current_command_buffer->draw();
-	current_command_buffer->end_render_pass();
 }
 
 
-void Graphics::draw( const Point& point )
+void Graphics::draw( const std::vector<const Point*>& points )
 {
-	vertex_buffer.upload( reinterpret_cast<const uint8_t*>( &point ), sizeof( Point ) );
-	current_command_buffer->begin_render_pass( render_pass, *current_framebuffer );
-	current_command_buffer->bind( pipeline );
-	current_command_buffer->bind_vertex_buffer( vertex_buffer );
-	current_command_buffer->draw();
-	current_command_buffer->end_render_pass();
+	current_point_vertex_buffer->set_vertex_count( points.size() );
+	for ( uint32_t i = 0; i < points.size(); ++i )
+	{
+		auto& point = *points[i];
+		current_point_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( &point ), i );
+	}
+	current_command_buffer->bind( point_pipeline );
+	current_command_buffer->bind_vertex_buffers( *current_point_vertex_buffer );
+	current_command_buffer->draw( points.size() );
+}
+
+
+void Graphics::draw( const std::vector<Point>& points )
+{
+	current_point_vertex_buffer->set_vertex_count( points.size() );
+	current_point_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( points.data() ) );
+	
+	current_command_buffer->bind( point_pipeline );
+	current_command_buffer->bind_vertex_buffers( *current_point_vertex_buffer );
+	current_command_buffer->draw( points.size() );
+}
+
+
+void Graphics::draw( const std::vector<Line>& lines )
+{
+	uint32_t vertex_count = lines.size() * 2;
+	current_line_vertex_buffer->set_vertex_count( vertex_count );
+	current_line_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( lines.data() ) );
+
+	current_command_buffer->bind( line_pipeline );
+	current_command_buffer->bind_vertex_buffers( *current_line_vertex_buffer );
+	current_command_buffer->draw( vertex_count );
 }
 
 

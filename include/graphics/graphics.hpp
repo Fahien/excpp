@@ -13,12 +13,21 @@ namespace graphics
 {
 
 
-struct Point
+struct alignas(16) Point
 {
 	Point( float xx = 0.0f, float yy = 0.0f ): x { xx }, y { yy } {}
 
 	float x = 0.0f;
 	float y = 0.0f;
+};
+
+
+struct alignas(16) Line
+{
+	Line( Point aa = {}, Point bb = {} ) : a { aa }, b { bb } {}
+
+	Point a = {};
+	Point b = {};
 };
 
 
@@ -64,6 +73,7 @@ class Semaphore
 	~Semaphore();
 
 	Semaphore( Semaphore&& other );
+	Semaphore& operator=(Semaphore&& other);
 
 	Device& device;
 	VkSemaphore handle = VK_NULL_HANDLE;
@@ -210,6 +220,44 @@ class Buffer
 };
 
 
+class VertexBuffers
+{
+  public:
+	/// @param size Size of each vertex buffer
+	VertexBuffers( Device& d, VkDeviceSize size, uint32_t capacity = 4 );
+	~VertexBuffers();
+
+	VertexBuffers( VertexBuffers&& o );
+
+	uint32_t get_vertex_count() const { return vertex_count; }
+	/// @param count Number of vertices to draw
+	void set_vertex_count( uint32_t count );
+
+	/// @param data Pointer to a single vertex
+	/// @param index Vertex buffer index
+	void upload( const uint8_t* data, uint32_t index );
+
+	/// @param data Pointer to a collection of vertices
+	void upload( const uint8_t* data );
+
+	Device& device;
+
+	/// Size of a single vertex buffer
+	VkDeviceSize size = 0;
+	std::vector<VkBuffer> handles;
+	std::vector<VkDeviceSize> offsets;
+	VkDeviceMemory memory = VK_NULL_HANDLE;
+
+  private:
+	void clear();
+	void create_buffers( const uint32_t count );
+
+	/// Current number of vertices
+	/// It can be less than the size of handles
+	uint32_t vertex_count = 0;
+};
+
+
 class GraphicsPipeline;
 
 
@@ -220,13 +268,17 @@ class CommandBuffer
 
 	void begin();
 
+	void set_viewport( const VkViewport& vp );
+	void set_scissor( const VkRect2D& scissor );
+
 	void begin_render_pass( RenderPass& rp, Framebuffer& fb );
 
 	void bind_vertex_buffer( Buffer& b );
+	void bind_vertex_buffers( VertexBuffers& vbs );
 
 	void bind( GraphicsPipeline& p );
 
-	void draw();
+	void draw( const uint32_t vertex_count = 1 );
 
 	void end_render_pass();
 
@@ -277,7 +329,14 @@ class PipelineLayout
 class GraphicsPipeline
 {
   public:
-	GraphicsPipeline( PipelineLayout& layout, ShaderModule& vert, ShaderModule& frag, RenderPass& render_pass );
+	GraphicsPipeline(
+		PipelineLayout& layout,
+		ShaderModule& vert,
+		ShaderModule& frag,
+		RenderPass& render_pass,
+		const VkViewport& viewport,
+		const VkRect2D& scissor,
+		VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST );
 	~GraphicsPipeline();
 
 	GraphicsPipeline& operator=( GraphicsPipeline&& o );
@@ -296,7 +355,9 @@ class Graphics
 	void render_end();
 
 	void draw();
-	void draw( const Point& p );
+	void draw( const std::vector<const Point*>& points );
+	void draw( const std::vector<Point>& points );
+	void draw( const std::vector<Line>& lines );
 
 	Glfw glfw;
 	Instance instance;
@@ -312,9 +373,17 @@ class Graphics
 	ShaderModule vert;
 	ShaderModule frag;
 	PipelineLayout layout;
-	GraphicsPipeline pipeline;
 
-	Buffer vertex_buffer;
+	VkViewport viewport = {};
+	VkRect2D   scissor  = {};
+
+	GraphicsPipeline line_pipeline;
+	GraphicsPipeline point_pipeline;
+
+	std::vector<VertexBuffers> point_vertex_buffers;
+	VertexBuffers* current_point_vertex_buffer = nullptr;
+	std::vector<VertexBuffers> line_vertex_buffers;
+	VertexBuffers* current_line_vertex_buffer = nullptr;
 
 	CommandPool command_pool;
 	std::vector<CommandBuffer> command_buffers;

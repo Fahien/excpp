@@ -40,6 +40,8 @@ class Glfw
 		
 		GLFWwindow* handle = nullptr;
 
+		VkExtent2D extent = { 600, 600 };
+
 		class Surface
 		{
 		  public:
