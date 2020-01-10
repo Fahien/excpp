@@ -1,37 +1,45 @@
 #include <cstdlib>
 #include <filesystem>
+#include <cmath>
 
 #include <graphics/graphics.hpp>
+
+
+std::vector<graphics::Line> create_square( graphics::Point a, graphics::Point b )
+{
+	std::vector<graphics::Line> lines(4);
+	lines[0].a = a;
+	lines[0].b.x = b.x;
+	lines[0].b.y = a.y;
+
+	lines[1].a = lines[0].b;
+	lines[1].b = b;
+
+	lines[2].a = b;
+	lines[2].b.x = a.x;
+	lines[2].b.y = b.y;
+
+	lines[3].a = lines[2].b;
+	lines[3].b = a;
+
+	return lines;
+}
 
 
 int main()
 {
 	using namespace graphics;
 	auto graphics = Graphics();
-	size_t lines_count = 64;
-	std::vector<Line> lines(lines_count);
-	std::vector<Point> points(2);
-	
-	for ( size_t i = 0; i < lines_count; ++i )
-	{
-		lines[i].a.x = -1.0f + i%2 * 2.0f;
-		lines[i].a.y = -1.0f;
-
-		lines[i].b.x = -1.0f + 2 * (i+i%2*1) / float(lines_count);
-		lines[i].b.y = 1.0;
-	}
-
-	points[0].x = -0.125f;
-	points[1].x = 0.125f;
-	points[0].y = points[1].y = -0.750f;
+	auto square1 = create_square({-0.5, -0.5}, {0.5, 0.5});
+	auto square2 = create_square({-0.3, -0.3}, {0.3, 0.3});
 
 	while ( graphics.window.is_alive() )
 	{
 		graphics.glfw.poll();
 		if ( graphics.render_begin() )
 		{
-			graphics.draw( lines );
-			graphics.draw( points );
+			graphics.draw( square1 );
+			graphics.draw( square2 );
 			graphics.render_end();
 		}
 	}

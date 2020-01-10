@@ -13,12 +13,26 @@ namespace graphics
 {
 
 
+struct alignas(16) Color
+{
+	Color( float rr = 0.0f, float gg = 0.0f, float bb = 0.0f, float aa = 1.0f )
+	: r { rr }, g { gg }, b { bb }, a { aa } {}
+
+	float r = 0.0f;
+	float g = 0.0f;
+	float b = 0.0f;
+	float a = 1.0f;
+};
+
+
 struct alignas(16) Point
 {
 	Point( float xx = 0.0f, float yy = 0.0f ): x { xx }, y { yy } {}
 
 	float x = 0.0f;
 	float y = 0.0f;
+
+	Color c = { 1.0f, 0.0f, 0.0f, 1.0f };
 };
 
 
@@ -35,7 +49,7 @@ template<typename T>
 VkVertexInputBindingDescription get_bindings();
 
 template<typename T>
-VkVertexInputAttributeDescription get_attributes();
+std::vector<VkVertexInputAttributeDescription> get_attributes();
 
 
 struct ValidationLayers
@@ -73,7 +87,7 @@ class Semaphore
 	~Semaphore();
 
 	Semaphore( Semaphore&& other );
-	Semaphore& operator=(Semaphore&& other);
+	Semaphore& operator=( Semaphore&& other );
 
 	Device& device;
 	VkSemaphore handle = VK_NULL_HANDLE;
@@ -250,7 +264,7 @@ class VertexBuffers
 
   private:
 	void clear();
-	void create_buffers( const uint32_t count );
+	void create_buffers( uint32_t count );
 
 	/// Current number of vertices
 	/// It can be less than the size of handles
@@ -378,6 +392,8 @@ class Graphics
 	VkRect2D   scissor  = {};
 
 	GraphicsPipeline line_pipeline;
+	std::vector<const Line*> lines;
+
 	GraphicsPipeline point_pipeline;
 
 	std::vector<VertexBuffers> point_vertex_buffers;
@@ -406,4 +422,4 @@ class Graphics
 };
 
 
-}
+} // namespace graphics

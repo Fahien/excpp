@@ -15,20 +15,27 @@ VkVertexInputBindingDescription get_bindings<Point>()
 {
 	VkVertexInputBindingDescription bindings = {};
 	bindings.binding = 0;
-	bindings.stride = sizeof(Point);
+	bindings.stride = sizeof( Point );
 	bindings.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	return bindings;
 }
 
 
 template <>
-VkVertexInputAttributeDescription get_attributes<Point>()
+std::vector<VkVertexInputAttributeDescription> get_attributes<Point>()
 {
-	VkVertexInputAttributeDescription attributes = {};
-	attributes.binding = 0;
-	attributes.location = 0;
-	attributes.format = VK_FORMAT_R32G32_SFLOAT;
-	attributes.offset = offsetof(Point, x);
+	std::vector<VkVertexInputAttributeDescription> attributes( 2 );
+
+	attributes[0].binding = 0;
+	attributes[0].location = 0;
+	attributes[0].format = VK_FORMAT_R32G32_SFLOAT;
+	attributes[0].offset = offsetof(Point, x);
+
+	attributes[1].binding = 0;
+	attributes[1].location = 1;
+	attributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	attributes[1].offset = offsetof(Point, c);
+
 	return attributes;
 }
 
@@ -562,7 +569,7 @@ void CommandBuffer::begin_render_pass( RenderPass& render_pass, Framebuffer& fra
 	info.renderArea.offset = { 0, 0 };
 	info.renderArea.extent = framebuffer.extent;
 
-	VkClearValue clear = { 0.0f, 0.2f, 0.3f, 1.0f };
+	VkClearValue clear = { 0.2f, 0.2f, 0.2f, 1.0f };
 	info.clearValueCount = 1;
 	info.pClearValues = &clear;
 
@@ -999,9 +1006,9 @@ GraphicsPipeline::GraphicsPipeline(
 	input_info.vertexBindingDescriptionCount = 1;
 	auto bindings = get_bindings<Point>();
 	input_info.pVertexBindingDescriptions = &bindings;
-	input_info.vertexAttributeDescriptionCount = 1;
 	auto attributes = get_attributes<Point>();
-	input_info.pVertexAttributeDescriptions = &attributes;
+	input_info.vertexAttributeDescriptionCount = attributes.size();
+	input_info.pVertexAttributeDescriptions = attributes.data();
 
 	VkPipelineInputAssemblyStateCreateInfo assembly_info = {};
 	assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -1253,6 +1260,22 @@ bool Graphics::render_begin()
 
 void Graphics::render_end()
 {
+	uint32_t vertex_count = lines.size() * 2;
+	current_line_vertex_buffer->set_vertex_count( vertex_count );
+
+	for ( size_t i = 0; i < lines.size(); ++i )
+	{
+		auto data_a = &lines[i]->a;
+		current_line_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( data_a ), i * 2 );
+		auto data_b = &lines[i]->b;
+		current_line_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( data_b ), i * 2 + 1 );
+	}
+	lines.clear();
+
+	current_command_buffer->bind( line_pipeline );
+	current_command_buffer->bind_vertex_buffers( *current_line_vertex_buffer );
+	current_command_buffer->draw( vertex_count );
+
 	current_command_buffer->end_render_pass();
 	current_command_buffer->end();
 
@@ -1296,15 +1319,12 @@ void Graphics::draw( const std::vector<Point>& points )
 }
 
 
-void Graphics::draw( const std::vector<Line>& lines )
+void Graphics::draw( const std::vector<Line>& ls )
 {
-	uint32_t vertex_count = lines.size() * 2;
-	current_line_vertex_buffer->set_vertex_count( vertex_count );
-	current_line_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( lines.data() ) );
-
-	current_command_buffer->bind( line_pipeline );
-	current_command_buffer->bind_vertex_buffers( *current_line_vertex_buffer );
-	current_command_buffer->draw( vertex_count );
+	for ( auto& line : ls )
+	{
+		lines.push_back( &line );
+	}
 }
 
 
