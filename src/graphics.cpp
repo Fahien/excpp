@@ -11,30 +11,30 @@ namespace graphics
 {
 
 template <>
-VkVertexInputBindingDescription get_bindings<Point>()
+VkVertexInputBindingDescription get_bindings<Dot>()
 {
 	VkVertexInputBindingDescription bindings = {};
 	bindings.binding = 0;
-	bindings.stride = sizeof( Point );
+	bindings.stride = sizeof( Dot );
 	bindings.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	return bindings;
 }
 
 
 template <>
-std::vector<VkVertexInputAttributeDescription> get_attributes<Point>()
+std::vector<VkVertexInputAttributeDescription> get_attributes<Dot>()
 {
 	std::vector<VkVertexInputAttributeDescription> attributes( 2 );
 
 	attributes[0].binding = 0;
 	attributes[0].location = 0;
 	attributes[0].format = VK_FORMAT_R32G32_SFLOAT;
-	attributes[0].offset = offsetof(Point, x);
+	attributes[0].offset = offsetof( Dot, p );
 
 	attributes[1].binding = 0;
 	attributes[1].location = 1;
 	attributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	attributes[1].offset = offsetof(Point, c);
+	attributes[1].offset = offsetof( Dot, c );
 
 	return attributes;
 }
@@ -1004,9 +1004,9 @@ GraphicsPipeline::GraphicsPipeline(
 	VkPipelineVertexInputStateCreateInfo input_info = {};
 	input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	input_info.vertexBindingDescriptionCount = 1;
-	auto bindings = get_bindings<Point>();
+	auto bindings = get_bindings<Dot>();
 	input_info.pVertexBindingDescriptions = &bindings;
-	auto attributes = get_attributes<Point>();
+	auto attributes = get_attributes<Dot>();
 	input_info.vertexAttributeDescriptionCount = attributes.size();
 	input_info.pVertexAttributeDescriptions = attributes.data();
 
@@ -1178,7 +1178,7 @@ Graphics::Graphics()
 , viewport { create_viewport( window ) }
 , scissor { create_scissor( window ) }
 , line_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_LINE_LIST }
-, point_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST }
+, dot_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
 , framebuffers { swapchain.create_framebuffers( render_pass ) }
@@ -1191,8 +1191,8 @@ Graphics::Graphics()
 		images_drawn.emplace_back( device );
 		frames_in_flight.emplace_back( device );
 
-		point_vertex_buffers.emplace_back( device, sizeof( Point ) );
-		line_vertex_buffers.emplace_back( device, sizeof( Point ) );
+		dot_vertex_buffers.emplace_back( device, sizeof( Dot ) );
+		line_vertex_buffers.emplace_back( device, sizeof( Dot ) );
 	}
 }
 
@@ -1224,7 +1224,7 @@ bool Graphics::render_begin()
 		viewport.height = window.extent.height;
 		scissor.extent = window.extent;
 
-		point_pipeline = GraphicsPipeline( layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST );
+		dot_pipeline = GraphicsPipeline( layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST );
 		line_pipeline  = GraphicsPipeline( layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_LINE_LIST );
 
 		framebuffers = swapchain.create_framebuffers( render_pass );
@@ -1249,7 +1249,7 @@ bool Graphics::render_begin()
 	current_command_buffer = &command_buffers[image_index];
 	current_framebuffer = &framebuffers[image_index];
 
-	current_point_vertex_buffer = &point_vertex_buffers[image_index];
+	current_dot_vertex_buffer = &dot_vertex_buffers[image_index];
 	current_line_vertex_buffer  = &line_vertex_buffers[image_index];
 
 	current_command_buffer->begin();
@@ -1294,28 +1294,28 @@ void Graphics::draw()
 }
 
 
-void Graphics::draw( const std::vector<const Point*>& points )
+void Graphics::draw( const std::vector<const Dot*>& dots )
 {
-	current_point_vertex_buffer->set_vertex_count( points.size() );
-	for ( uint32_t i = 0; i < points.size(); ++i )
+	current_dot_vertex_buffer->set_vertex_count( dots.size() );
+	for ( uint32_t i = 0; i < dots.size(); ++i )
 	{
-		auto& point = *points[i];
-		current_point_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( &point ), i );
+		auto& point = *dots[i];
+		current_dot_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( &point ), i );
 	}
-	current_command_buffer->bind( point_pipeline );
-	current_command_buffer->bind_vertex_buffers( *current_point_vertex_buffer );
-	current_command_buffer->draw( points.size() );
+	current_command_buffer->bind( dot_pipeline );
+	current_command_buffer->bind_vertex_buffers( *current_dot_vertex_buffer );
+	current_command_buffer->draw( dots.size() );
 }
 
 
-void Graphics::draw( const std::vector<Point>& points )
+void Graphics::draw( const std::vector<Dot>& dots )
 {
-	current_point_vertex_buffer->set_vertex_count( points.size() );
-	current_point_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( points.data() ) );
+	current_dot_vertex_buffer->set_vertex_count( dots.size() );
+	current_dot_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( dots.data() ) );
 	
-	current_command_buffer->bind( point_pipeline );
-	current_command_buffer->bind_vertex_buffers( *current_point_vertex_buffer );
-	current_command_buffer->draw( points.size() );
+	current_command_buffer->bind( dot_pipeline );
+	current_command_buffer->bind_vertex_buffers( *current_dot_vertex_buffer );
+	current_command_buffer->draw( dots.size() );
 }
 
 

@@ -5,19 +5,19 @@
 #include <graphics/graphics.hpp>
 
 
-std::vector<graphics::Line> create_square( graphics::Point a, graphics::Point b )
+std::vector<graphics::Line> create_square( graphics::Dot a, graphics::Dot b )
 {
 	std::vector<graphics::Line> lines(4);
 	lines[0].a = a;
-	lines[0].b.x = b.x;
-	lines[0].b.y = a.y;
+	lines[0].b.p.x = b.p.x;
+	lines[0].b.p.y = a.p.y;
 
 	lines[1].a = lines[0].b;
 	lines[1].b = b;
 
 	lines[2].a = b;
-	lines[2].b.x = a.x;
-	lines[2].b.y = b.y;
+	lines[2].b.p.x = a.p.x;
+	lines[2].b.p.y = b.p.y;
 
 	lines[3].a = lines[2].b;
 	lines[3].b = a;

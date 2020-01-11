@@ -31,17 +31,24 @@ struct alignas(16) Point
 
 	float x = 0.0f;
 	float y = 0.0f;
+};
 
+
+struct alignas(16) Dot
+{
+	Dot( float x = 0.0f, float y = 0.0f ) : p { x, y } {}
+
+	Point p = {};
 	Color c = { 1.0f, 0.0f, 0.0f, 1.0f };
 };
 
 
 struct alignas(16) Line
 {
-	Line( Point aa = {}, Point bb = {} ) : a { aa }, b { bb } {}
+	Line( Dot aa = {}, Dot bb = {} ) : a { aa }, b { bb } {}
 
-	Point a = {};
-	Point b = {};
+	Dot a = {};
+	Dot b = {};
 };
 
 
@@ -369,8 +376,8 @@ class Graphics
 	void render_end();
 
 	void draw();
-	void draw( const std::vector<const Point*>& points );
-	void draw( const std::vector<Point>& points );
+	void draw( const std::vector<const Dot*>& dots );
+	void draw( const std::vector<Dot>& dots );
 	void draw( const std::vector<Line>& lines );
 
 	Glfw glfw;
@@ -393,11 +400,10 @@ class Graphics
 
 	GraphicsPipeline line_pipeline;
 	std::vector<const Line*> lines;
+	GraphicsPipeline dot_pipeline;
 
-	GraphicsPipeline point_pipeline;
-
-	std::vector<VertexBuffers> point_vertex_buffers;
-	VertexBuffers* current_point_vertex_buffer = nullptr;
+	std::vector<VertexBuffers> dot_vertex_buffers;
+	VertexBuffers* current_dot_vertex_buffer = nullptr;
 	std::vector<VertexBuffers> line_vertex_buffers;
 	VertexBuffers* current_line_vertex_buffer = nullptr;
 
