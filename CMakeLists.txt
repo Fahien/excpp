@@ -14,6 +14,7 @@ include(compile_shaders)
 set( SOURCES 
 	${CMAKE_CURRENT_SOURCE_DIR}/src/graphics.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/glfw.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/math.cpp
 )
 add_library( ${PROJECT_NAME} ${SOURCES} )
 target_include_directories( ${PROJECT_NAME} PUBLIC

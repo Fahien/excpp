@@ -7,6 +7,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "graphics/glfw.hpp"
+#include "math/math.h"
 
 
 namespace graphics
@@ -36,19 +37,41 @@ struct alignas(16) Point
 
 struct alignas(16) Dot
 {
-	Dot( float x = 0.0f, float y = 0.0f ) : p { x, y } {}
+	Dot( float x = 0.0f, float y = 0.0f, Color cc = { 1.0f } ) : p { x, y }, c { cc } {}
 
 	Point p = {};
-	Color c = { 1.0f, 0.0f, 0.0f, 1.0f };
+	Color c = {};
 };
 
 
-struct alignas(16) Line
+struct Line
 {
 	Line( Dot aa = {}, Dot bb = {} ) : a { aa }, b { bb } {}
 
 	Dot a = {};
 	Dot b = {};
+};
+
+
+struct Rect
+{
+	Rect( Dot bottom_left, Dot top_right );
+
+	Rect( Dot aa, Dot bb, Dot cc, Dot dd )
+	: a { aa }, b { bb }, c { cc }, d { dd } {}
+
+	Dot a = {};
+	Dot b = {};
+	Dot c = {};
+	Dot d = {};
+
+	math::Mat4 model = math::Mat4::identity;
+};
+
+
+struct alignas(16) UniformBufferObject
+{
+	math::Mat4 model;
 };
 
 
@@ -233,6 +256,9 @@ class Buffer
 	Buffer( Device& d, VkDeviceSize size, VkBufferUsageFlags usage );
 	~Buffer();
 
+	Buffer( Buffer&& o );
+	Buffer& operator=( Buffer&& o );
+
 	void upload( const uint8_t* data, VkDeviceSize size );
 
 	Device& device;
@@ -280,7 +306,7 @@ class VertexBuffers
 
 
 class GraphicsPipeline;
-
+class PipelineLayout;
 
 class CommandBuffer
 {
@@ -298,6 +324,8 @@ class CommandBuffer
 	void bind_vertex_buffers( VertexBuffers& vbs );
 
 	void bind( GraphicsPipeline& p );
+
+	void bind_descriptor_sets( const PipelineLayout& layout, VkDescriptorSet set );
 
 	void draw( const uint32_t vertex_count = 1 );
 
@@ -336,6 +364,18 @@ class ShaderModule
 };
 
 
+class DescriptorSetLayout
+{
+  public:
+	DescriptorSetLayout( Device& d );
+	~DescriptorSetLayout();
+
+	Device& device;
+
+	VkDescriptorSetLayout handle = VK_NULL_HANDLE;
+};
+
+
 class PipelineLayout
 {
   public:
@@ -343,6 +383,8 @@ class PipelineLayout
 	~PipelineLayout();
 
 	Device& device;
+	DescriptorSetLayout descriptor_set_layout;
+
 	VkPipelineLayout handle = VK_NULL_HANDLE;
 };
 
@@ -367,6 +409,22 @@ class GraphicsPipeline
 };
 
 
+class DescriptorPool
+{
+  public:
+	/// @param size Size of the pool, number of descriptors available
+	DescriptorPool( Device& d, uint32_t size );
+	~DescriptorPool();
+
+	std::vector<VkDescriptorSet> allocate( const DescriptorSetLayout& layout, uint32_t count = 1 );
+
+	Device& device;
+	uint32_t size;
+
+	VkDescriptorPool handle = VK_NULL_HANDLE;
+};
+
+
 class Graphics
 {
   public:
@@ -379,6 +437,7 @@ class Graphics
 	void draw( const std::vector<const Dot*>& dots );
 	void draw( const std::vector<Dot>& dots );
 	void draw( const std::vector<Line>& lines );
+	void draw( const Rect& rect );
 
 	Glfw glfw;
 	Instance instance;
@@ -399,13 +458,21 @@ class Graphics
 	VkRect2D   scissor  = {};
 
 	GraphicsPipeline line_pipeline;
-	std::vector<const Line*> lines;
+	std::vector<const Dot*> lines;
 	GraphicsPipeline dot_pipeline;
 
 	std::vector<VertexBuffers> dot_vertex_buffers;
 	VertexBuffers* current_dot_vertex_buffer = nullptr;
 	std::vector<VertexBuffers> line_vertex_buffers;
 	VertexBuffers* current_line_vertex_buffer = nullptr;
+
+	DescriptorPool descriptor_pool;
+
+	std::vector<Buffer> uniform_buffers;
+	std::vector<VkDescriptorSet> descriptor_sets;
+	Buffer* current_uniform_buffer = nullptr;
+	VkDescriptorSet current_descriptor_set = VK_NULL_HANDLE;
+
 
 	CommandPool command_pool;
 	std::vector<CommandBuffer> command_buffers;

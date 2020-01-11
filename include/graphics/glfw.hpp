@@ -27,6 +27,8 @@ class Glfw
 	~Glfw();
 
 	void poll();
+	
+	double get_delta();
 
 	RequiredExtensions required_extensions;
 
@@ -37,7 +39,7 @@ class Glfw
 		~Window();
 
 		bool is_alive();
-		
+
 		GLFWwindow* handle = nullptr;
 
 		VkExtent2D extent = { 600, 600 };
@@ -52,6 +54,10 @@ class Glfw
 			VkSurfaceKHR handle = VK_NULL_HANDLE;
 		};
 	};
+
+  private:
+	double time = 0;
+
 };
 
 

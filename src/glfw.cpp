@@ -16,6 +16,8 @@ Glfw::Glfw()
 
 	required_extensions.names = glfwGetRequiredInstanceExtensions( &required_extensions.count );
 
+	time = glfwGetTime();
+
 	assert( glfwVulkanSupported() && "Vulkan not supported" );
 }
 
@@ -29,6 +31,15 @@ Glfw::~Glfw()
 void Glfw::poll()
 {
 	glfwPollEvents();
+}
+
+
+double Glfw::get_delta()
+{
+	auto current = glfwGetTime();
+	auto delta = current - time;
+	time = current;
+	return delta;
 }
 
 
