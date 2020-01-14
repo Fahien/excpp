@@ -377,205 +377,6 @@ void Fence::reset()
 }
 
 
-Buffer::Buffer( Device& d, const VkDeviceSize size, const VkBufferUsageFlags usage )
-: device { d }
-{
-	VkBufferCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	info.size = size;
-	info.usage = usage;
-
-	// Not share between multiple queues at the same time
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	auto res = vkCreateBuffer( device.handle, &info, nullptr, &handle );
-	assert( res == VK_SUCCESS && "Cannot create buffer" );
-
-	VkMemoryRequirements requirements;
-	vkGetBufferMemoryRequirements( device.handle, handle, &requirements );
-
-	VkMemoryAllocateInfo meminfo = {};
-	meminfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	meminfo.allocationSize = requirements.size;
-	auto memory_type = device.physical_device.get_memory_type( requirements.memoryTypeBits,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-	meminfo.memoryTypeIndex = memory_type;
-
-	res = vkAllocateMemory( device.handle, &meminfo, nullptr, &memory );
-	assert( res == VK_SUCCESS && "Cannot allocate memory" );
-
-	res = vkBindBufferMemory( device.handle, handle, memory, /* offset */ 0 );
-	assert( res == VK_SUCCESS && "Cannot bind memory to buffer" );
-}
-
-
-Buffer::~Buffer()
-{
-	if ( handle != VK_NULL_HANDLE )
-	{
-		vkDestroyBuffer( device.handle, handle, nullptr );
-	}
-
-	if ( memory != VK_NULL_HANDLE )
-	{
-		vkFreeMemory( device.handle, memory, nullptr );
-	}
-}
-
-
-Buffer::Buffer( Buffer&& o )
-: device { o.device }
-, handle { o.handle }
-, memory { o.memory }
-{
-	o.handle = VK_NULL_HANDLE;
-	o.memory = VK_NULL_HANDLE;
-}
-
-
-Buffer& Buffer::operator=( Buffer&& o )
-{
-	assert( device.handle == o.device.handle && "Cannot move assign buffer from different device" );
-	std::swap( handle, o.handle );
-	std::swap( memory, o.memory );
-
-	return *this;
-}
-
-
-void Buffer::upload( const uint8_t* data, const VkDeviceSize size )
-{
-	void* temp;
-	vkMapMemory( device.handle, memory, 0, size, 0, &temp);
-	std::memcpy( temp, data, size );
-	vkUnmapMemory( device.handle, memory );
-}
-
-
-void VertexBuffers::create_buffers( const uint32_t count )
-{
-	assert( count > 0 && "Cannot create 0 buffers" );
-
-	if (count > handles.size())
-	{
-		clear();
-
-		VkBufferCreateInfo info = {};
-		info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		info.size = count * size;
-		info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-		// Not share between multiple queues at the same time
-		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		// Make space for handles
-		handles.resize( 1 );
-		offsets.resize( 1 );
-
-		for ( uint32_t i = 0; i < 1; ++i )
-		{
-			offsets[i] = size * i;
-			auto res = vkCreateBuffer( device.handle, &info, nullptr, &handles[i] );
-			assert( res == VK_SUCCESS && "Cannot create buffer" );
-		}
-
-		VkMemoryRequirements requirements;
-		vkGetBufferMemoryRequirements( device.handle, handles[0], &requirements );
-
-		VkMemoryAllocateInfo meminfo = {};
-		meminfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		// Allocate enough memory for each buffer
-		meminfo.allocationSize = requirements.size * count;
-		auto memory_type = device.physical_device.get_memory_type( requirements.memoryTypeBits,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-		meminfo.memoryTypeIndex = memory_type;
-
-		if ( memory != VK_NULL_HANDLE )
-		{
-			// Release previous memory
-			vkFreeMemory( device.handle, memory, nullptr );
-		}
-
-		auto res = vkAllocateMemory( device.handle, &meminfo, nullptr, &memory );
-		assert( res == VK_SUCCESS && "Cannot allocate memory" );
-
-		//for ( uint32_t i = 0; i < count; ++i )
-		//{
-			//uint32_t offset = i * size;
-			//printf( "Binding mem %u offset %u\n", i, offset );
-			res = vkBindBufferMemory( device.handle, handles[0], memory, 0 );
-			assert( res == VK_SUCCESS && "Cannot bind memory to buffer" );
-		//}
-	}
-}
-
-VertexBuffers::VertexBuffers( Device& d, const VkDeviceSize ds, const uint32_t count )
-: device { d }
-, size { ds }
-{
-	create_buffers( count );
-}
-
-void VertexBuffers::clear()
-{
-	for ( auto handle : handles )
-	{
-		vkDestroyBuffer( device.handle, handle, nullptr );
-		handles.clear();
-	}
-
-	if ( memory != VK_NULL_HANDLE )
-	{
-		vkFreeMemory( device.handle, memory, nullptr );
-		memory = VK_NULL_HANDLE;
-	}
-}
-
-
-VertexBuffers::~VertexBuffers()
-{
-	clear();
-}
-
-
-VertexBuffers::VertexBuffers( VertexBuffers&& other )
-: device { other.device }
-, vertex_count { other.vertex_count }
-, size { other.size }
-, handles { std::move( other.handles ) }
-, offsets { std::move( other.offsets ) }
-, memory { other.memory }
-{
-	other.memory = VK_NULL_HANDLE;
-}
-
-
-void VertexBuffers::set_vertex_count( const uint32_t count )
-{
-	create_buffers( count );
-	vertex_count = count;
-}
-
-
-void VertexBuffers::upload( const uint8_t* data, const uint32_t index )
-{
-	assert( index < vertex_count && "Cannot upload vertex out of bounds" );
-	void* temp;
-	VkDeviceSize offset = size * index;
-	vkMapMemory( device.handle, memory, offset, size, 0, &temp);
-	std::memcpy( temp, data, size );
-	vkUnmapMemory( device.handle, memory );
-}
-
-
-void VertexBuffers::upload( const uint8_t* data )
-{
-	void* temp;
-	vkMapMemory( device.handle, memory, 0, size * vertex_count, 0, &temp);
-	std::memcpy( temp, data, size * vertex_count );
-	vkUnmapMemory( device.handle, memory );
-}
-
-
 CommandBuffer::CommandBuffer( const VkCommandBuffer h )
 : handle { h }
 {}
@@ -1031,33 +832,6 @@ PipelineLayout::~PipelineLayout()
 }
 
 
-DescriptorSetLayout::DescriptorSetLayout( Device& d )
-: device { d }
-{
-	VkDescriptorSetLayoutBinding binding = {};
-	binding.binding = 0;
-	binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	binding.descriptorCount = 1;
-	binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-	VkDescriptorSetLayoutCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	info.bindingCount = 1;
-	info.pBindings = &binding;
-
-	auto res = vkCreateDescriptorSetLayout( device.handle, &info, nullptr, &handle );
-	assert( res == VK_SUCCESS && "Cannot create descriptor set layout" );
-}
-
-
-DescriptorSetLayout::~DescriptorSetLayout()
-{
-	if ( handle != VK_NULL_HANDLE )
-	{
-		vkDestroyDescriptorSetLayout( device.handle, handle, nullptr );
-	}
-}
-
 
 GraphicsPipeline::GraphicsPipeline(
 	PipelineLayout& layout,
@@ -1199,51 +973,6 @@ GraphicsPipeline& GraphicsPipeline::operator=( GraphicsPipeline&& other )
 }
 
 
-DescriptorPool::DescriptorPool( Device& d, const uint32_t sz )
-: device { d }
-, size { sz }
-{
-	VkDescriptorPoolSize pool_size = {};
-	pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	pool_size.descriptorCount = size;
-
-	VkDescriptorPoolCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	info.poolSizeCount = 1;
-	info.pPoolSizes = &pool_size;
-	info.maxSets = size;
-
-	auto res = vkCreateDescriptorPool( device.handle, &info, nullptr, &handle );
-	assert( res == VK_SUCCESS && "Cannot create descriptor pool" );
-}
-
-
-DescriptorPool::~DescriptorPool()
-{
-	if ( handle != VK_NULL_HANDLE )
-	{
-		vkDestroyDescriptorPool( device.handle, handle, nullptr );
-	}
-}
-
-
-std::vector<VkDescriptorSet> DescriptorPool::allocate( const DescriptorSetLayout& layout, const uint32_t count )
-{
-	const std::vector<VkDescriptorSetLayout> layouts( count, layout.handle );
-
-	VkDescriptorSetAllocateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	info.descriptorPool = handle;
-	info.descriptorSetCount = count;
-	info.pSetLayouts = layouts.data();
-
-	std::vector<VkDescriptorSet> sets( count );
-	const auto res = vkAllocateDescriptorSets( device.handle, &info, sets.data() );
-	assert( res == VK_SUCCESS && "Cannot create descriptor sets" );
-
-	return sets;
-}
-
 ValidationLayers get_validation_layers()
 {
 	static std::vector<const char*> layer_names = {
@@ -1292,8 +1021,7 @@ Graphics::Graphics()
 , scissor { create_scissor( window ) }
 , line_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_LINE_LIST }
 , dot_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST }
-, descriptor_pool { device, static_cast<uint32_t>( swapchain.images.size() ) }
-, descriptor_sets { descriptor_pool.allocate( layout.descriptor_set_layout, static_cast<uint32_t>( swapchain.images.size() ) ) }
+, renderer { device, swapchain, layout }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
 , framebuffers { swapchain.create_framebuffers( render_pass ) }
@@ -1305,28 +1033,6 @@ Graphics::Graphics()
 		images_available.emplace_back( device );
 		images_drawn.emplace_back( device );
 		frames_in_flight.emplace_back( device );
-
-		dot_vertex_buffers.emplace_back( device, sizeof( Dot ) );
-		line_vertex_buffers.emplace_back( device, sizeof( Dot ) );
-		uniform_buffers.emplace_back( device, sizeof( UniformBufferObject ), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT );
-
-		VkDescriptorBufferInfo bufferInfo = {};
-		bufferInfo.buffer = uniform_buffers[i].handle;
-		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof( UniformBufferObject );
-
-		VkWriteDescriptorSet descriptorWrite = {};
-		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite.dstSet = descriptor_sets[i];
-		descriptorWrite.dstBinding = 0;
-		descriptorWrite.dstArrayElement = 0;
-
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite.descriptorCount = 1;
-
-		descriptorWrite.pBufferInfo = &bufferInfo;
-
-		vkUpdateDescriptorSets(device.handle, 1, &descriptorWrite, 0, nullptr);
 	}
 }
 
@@ -1383,11 +1089,6 @@ bool Graphics::render_begin()
 	current_command_buffer = &command_buffers[image_index];
 	current_framebuffer = &framebuffers[image_index];
 
-	current_dot_vertex_buffer = &dot_vertex_buffers[image_index];
-	current_line_vertex_buffer  = &line_vertex_buffers[image_index];
-	current_uniform_buffer = &uniform_buffers[image_index];
-	current_descriptor_set = descriptor_sets[image_index];
-
 	current_command_buffer->begin();
 	current_command_buffer->begin_render_pass( render_pass, *current_framebuffer );
 
@@ -1396,21 +1097,6 @@ bool Graphics::render_begin()
 
 void Graphics::render_end()
 {
-	uint32_t vertex_count = lines.size();
-	current_line_vertex_buffer->set_vertex_count( vertex_count );
-
-	for ( size_t i = 0; i < lines.size(); ++i )
-	{
-		auto data = lines[i];
-		current_line_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( data ), i );
-	}
-	lines.clear();
-
-	current_command_buffer->bind( line_pipeline );
-	current_command_buffer->bind_vertex_buffers( *current_line_vertex_buffer );
-	current_command_buffer->bind_descriptor_sets( layout, current_descriptor_set );
-	current_command_buffer->draw( vertex_count );
-
 	current_command_buffer->end_render_pass();
 	current_command_buffer->end();
 
@@ -1431,52 +1117,33 @@ void Graphics::draw()
 
 void Graphics::draw( const std::vector<const Dot*>& dots )
 {
-	current_dot_vertex_buffer->set_vertex_count( dots.size() );
-	for ( uint32_t i = 0; i < dots.size(); ++i )
-	{
-		auto& point = *dots[i];
-		current_dot_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( &point ), i );
-	}
-	current_command_buffer->bind( dot_pipeline );
-	current_command_buffer->bind_vertex_buffers( *current_dot_vertex_buffer );
-	current_command_buffer->draw( dots.size() );
 }
 
 
 void Graphics::draw( const std::vector<Dot>& dots )
 {
-	current_dot_vertex_buffer->set_vertex_count( dots.size() );
-	current_dot_vertex_buffer->upload( reinterpret_cast<const uint8_t*>( dots.data() ) );
-	
-	current_command_buffer->bind( dot_pipeline );
-	current_command_buffer->bind_vertex_buffers( *current_dot_vertex_buffer );
-	current_command_buffer->draw( dots.size() );
 }
 
 
 void Graphics::draw( const std::vector<Line>& ls )
 {
-	for ( auto& line : ls )
-	{
-		lines.push_back( &line.a );
-		lines.push_back( &line.b );
-	}
 }
 
 
 void Graphics::draw( const Rect& rect )
 {
-	lines.push_back( &rect.a );
-	lines.push_back( &rect.b );
-	lines.push_back( &rect.b );
-	lines.push_back( &rect.c );
-	lines.push_back( &rect.c );
-	lines.push_back( &rect.d );
-	lines.push_back( &rect.d );
-	lines.push_back( &rect.a );
+	auto& resources = renderer.rect_resources.find( &rect )->second;
 
 	auto data = reinterpret_cast<const uint8_t*>( &rect.model.matrix );
-	current_uniform_buffer->upload( data, sizeof( UniformBufferObject ) );
+	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];
+	uniform_buffer.upload( data, sizeof( UniformBufferObject ) );
+
+	current_command_buffer->bind( line_pipeline );
+	current_command_buffer->bind_vertex_buffers( resources.vertex_buffer );
+
+	auto& descriptor_set = resources.descriptor_sets[current_frame_index];
+	current_command_buffer->bind_descriptor_sets( layout, descriptor_set );
+	current_command_buffer->draw( resources.vertex_buffer.get_vertex_count() );
 }
 
 
