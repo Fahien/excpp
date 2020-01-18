@@ -9,6 +9,7 @@ namespace graphics
 {
 
 struct Rect;
+struct Triangle;
 class Device;
 class Swapchain;
 class PipelineLayout;
@@ -29,6 +30,7 @@ class Renderer
   public:
 	Renderer( Device& d, Swapchain& s, PipelineLayout& l );
 
+	void add( const Triangle& t );
 	void add( const Rect& r );
 
 	Device& device;
@@ -40,6 +42,7 @@ class Renderer
 	/// - uniform buffers that can change per swapchain image
 	/// - DescriptorPool and DescriptorSet per swapchain image
 	std::unordered_map<const Rect*, Resources> rect_resources;
+	std::unordered_map<const Triangle*, Resources> triangle_resources;
 };
 
 }

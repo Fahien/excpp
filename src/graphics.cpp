@@ -11,12 +11,15 @@ namespace graphics
 {
 
 
+Point::Point( float xx, float yy, float zz ) : x { xx }, y { yy }, z { zz } {}
+
+
 Rect::Rect( Dot bottom_left, Dot top_right )
 : dots {
 		bottom_left,
-		{ top_right.p.x, bottom_left.p.y, bottom_left.c },
+		{ { top_right.p.x, bottom_left.p.y, 0.0f }, bottom_left.c },
 		top_right,
-		{ bottom_left.p.x, top_right.p.y, top_right.c }
+		{ { bottom_left.p.x, top_right.p.y, 0.0f }, top_right.c }
 	}
 {
 }
@@ -40,7 +43,7 @@ std::vector<VkVertexInputAttributeDescription> get_attributes<Dot>()
 
 	attributes[0].binding = 0;
 	attributes[0].location = 0;
-	attributes[0].format = VK_FORMAT_R32G32_SFLOAT;
+	attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 	attributes[0].offset = offsetof( Dot, p );
 
 	attributes[1].binding = 0;
@@ -1121,6 +1124,24 @@ void Graphics::render_end()
 	graphics_queue.submit( *current_command_buffer, { current_image_available->handle }, { image_drawn.handle }, current_frame_in_flight );
 
 	present_queue.present( { swapchain.handle }, { current_frame_index }, { image_drawn.handle } );
+}
+
+
+void Graphics::draw( const Triangle& rect )
+{
+	auto& resources = renderer.triangle_resources.find( &rect )->second;
+
+	auto data = reinterpret_cast<const uint8_t*>( &rect.model.matrix );
+	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];
+	uniform_buffer.upload( data, sizeof( UniformBufferObject ) );
+
+	current_command_buffer->bind( line_pipeline );
+	current_command_buffer->bind_vertex_buffers( resources.vertex_buffer );
+	current_command_buffer->bind_index_buffer( resources.index_buffer );
+
+	auto& descriptor_set = resources.descriptor_sets[current_frame_index];
+	current_command_buffer->bind_descriptor_sets( layout, descriptor_set );
+	current_command_buffer->draw_indexed( resources.index_buffer.count() );
 }
 
 

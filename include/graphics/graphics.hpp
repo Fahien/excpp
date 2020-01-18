@@ -33,28 +33,34 @@ struct alignas(16) Color
 
 struct alignas(16) Point
 {
-	Point( float xx = 0.0f, float yy = 0.0f ): x { xx }, y { yy } {}
+	Point( float xx = 0.0f, float yy = 0.0f, float zz = 0.0f );
 
 	float x = 0.0f;
 	float y = 0.0f;
+	float z = 0.0f;
 };
 
 
 struct alignas(16) Dot
 {
-	Dot( float x = 0.0f, float y = 0.0f, Color cc = { 1.0f } ) : p { x, y }, c { cc } {}
+	Dot( Point pp = {}, Color cc = { 1.0f } ) : p { pp }, c { cc } {}
 
 	Point p = {};
 	Color c = {};
 };
 
 
-struct Line
+struct Triangle
 {
-	Line( Dot aa = {}, Dot bb = {} ) : a { aa }, b { bb } {}
+	Triangle( Dot a, Dot b, Dot c )
+	: dots { a, b, c }
+	{}
 
-	Dot a = {};
-	Dot b = {};
+	std::array<Dot, 3> dots = {};
+
+	const std::array<Index, 6> indices = { 0, 1, 1, 2, 2, 0 };
+
+	math::Mat4 model = math::Mat4::identity;
 };
 
 
@@ -62,8 +68,8 @@ struct Rect
 {
 	Rect( Dot bottom_left, Dot top_right );
 
-	Rect( Dot aa, Dot bb, Dot cc, Dot dd )
-	: dots { aa, bb, cc, dd }
+	Rect( Dot a, Dot b, Dot c, Dot d )
+	: dots { a, b, c, d }
 	{}
 
 	std::array<Dot, 4> dots = {};
@@ -357,6 +363,7 @@ class Graphics
 	bool render_begin();
 	void render_end();
 
+	void draw( const Triangle& tri );
 	void draw( const Rect& rect );
 
 	Glfw glfw;

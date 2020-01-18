@@ -48,6 +48,35 @@ Resources::Resources( Device& d, Swapchain& s, PipelineLayout& l )
 }
 
 
+void Renderer::add( const Triangle& rect )
+{
+	// Find Vulkan resources associated to this rect
+	auto it = triangle_resources.find( &rect );
+	if ( it == std::end( triangle_resources ) )
+	{
+		auto[new_it, ok] = triangle_resources.emplace(
+			&rect,
+			Resources( device, swapchain, layout )
+		);
+		if (ok)
+		{
+			it = new_it;
+		}
+	}
+
+	// Vertices
+	auto& vertex_buffer = it->second.vertex_buffer;
+	vertex_buffer.set_count( rect.dots.size() );
+	vertex_buffer.upload( reinterpret_cast<const uint8_t*>( rect.dots.data() ) );
+
+	// Indices
+	auto& index_buffer = it->second.index_buffer;
+	index_buffer.set_count( rect.indices.size() );
+	index_buffer.upload( reinterpret_cast<const uint8_t*>( rect.indices.data() ) );
+}
+
+
+
 void Renderer::add( const Rect& rect )
 {
 	// Find Vulkan resources associated to this rect
