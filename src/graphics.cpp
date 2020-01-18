@@ -12,10 +12,12 @@ namespace graphics
 
 
 Rect::Rect( Dot bottom_left, Dot top_right )
-: a { bottom_left }
-, b { top_right.p.x, a.p.y, a.c }
-, c { top_right }
-, d { a.p.x, c.p.y, c.c }
+: dots {
+		bottom_left,
+		{ top_right.p.x, bottom_left.p.y, bottom_left.c },
+		top_right,
+		{ bottom_left.p.x, top_right.p.y, top_right.c }
+	}
 {
 }
 
@@ -434,12 +436,15 @@ void CommandBuffer::bind_vertex_buffer( Buffer& buffer )
 }
 
 
-void CommandBuffer::bind_vertex_buffers( VertexBuffers& buffers )
+void CommandBuffer::bind_vertex_buffers( DynamicBuffer& buffers )
 {
-	vkCmdBindVertexBuffers( handle, 0,
-		1,
-		buffers.handles.data(),
-		buffers.offsets.data() );
+	vkCmdBindVertexBuffers( handle, 0, 1, &buffers.handle, &buffers.offset );
+}
+
+
+void CommandBuffer::bind_index_buffer( DynamicBuffer& buffer )
+{
+	vkCmdBindIndexBuffer( handle, buffer.handle, 0, VK_INDEX_TYPE_UINT16 );
 }
 
 
@@ -453,6 +458,13 @@ void CommandBuffer::draw( const uint32_t vertex_count )
 {
 	assert( vertex_count > 0 && "Cannot draw 0 vertices" );
 	vkCmdDraw( handle, vertex_count, 1, 0, 0 );
+}
+
+
+void CommandBuffer::draw_indexed( const uint32_t index_count )
+{
+	assert( index_count > 0 && "Cannot draw 0 indices" );
+	vkCmdDrawIndexed( handle, index_count, 1, 0, 0, 0 );
 }
 
 
@@ -986,6 +998,7 @@ ValidationLayers get_validation_layers()
 	return layers;
 }
 
+
 VkViewport create_viewport( const Glfw::Window& window )
 {
 	VkViewport viewport = {};
@@ -998,6 +1011,7 @@ VkViewport create_viewport( const Glfw::Window& window )
 	return viewport;
 }
 
+
 VkRect2D create_scissor( const Glfw::Window& window )
 {
 	VkRect2D scissor = {};
@@ -1005,6 +1019,7 @@ VkRect2D create_scissor( const Glfw::Window& window )
 	scissor.extent = window.extent;
 	return scissor;
 }
+
 
 Graphics::Graphics()
 : instance { glfw.required_extensions, get_validation_layers() }
@@ -1095,6 +1110,7 @@ bool Graphics::render_begin()
 	return true;
 }
 
+
 void Graphics::render_end()
 {
 	current_command_buffer->end_render_pass();
@@ -1108,28 +1124,6 @@ void Graphics::render_end()
 }
 
 
-void Graphics::draw()
-{
-	current_command_buffer->bind( line_pipeline );
-	current_command_buffer->draw();
-}
-
-
-void Graphics::draw( const std::vector<const Dot*>& dots )
-{
-}
-
-
-void Graphics::draw( const std::vector<Dot>& dots )
-{
-}
-
-
-void Graphics::draw( const std::vector<Line>& ls )
-{
-}
-
-
 void Graphics::draw( const Rect& rect )
 {
 	auto& resources = renderer.rect_resources.find( &rect )->second;
@@ -1140,10 +1134,11 @@ void Graphics::draw( const Rect& rect )
 
 	current_command_buffer->bind( line_pipeline );
 	current_command_buffer->bind_vertex_buffers( resources.vertex_buffer );
+	current_command_buffer->bind_index_buffer( resources.index_buffer );
 
 	auto& descriptor_set = resources.descriptor_sets[current_frame_index];
 	current_command_buffer->bind_descriptor_sets( layout, descriptor_set );
-	current_command_buffer->draw( resources.vertex_buffer.get_vertex_count() );
+	current_command_buffer->draw_indexed( resources.index_buffer.count() );
 }
 
 

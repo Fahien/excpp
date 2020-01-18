@@ -15,7 +15,8 @@ Renderer::Renderer( Device& d, Swapchain& s, PipelineLayout& l )
 
 
 Resources::Resources( Device& d, Swapchain& s, PipelineLayout& l )
-: vertex_buffer { d, sizeof( Dot ) }
+: vertex_buffer { d, sizeof( Dot ), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT }
+, index_buffer { d, sizeof( Index ), VK_BUFFER_USAGE_INDEX_BUFFER_BIT }
 , uniform_buffers {}
 , descriptor_pool { d, static_cast<uint32_t>( s.images.size() ) }
 , descriptor_sets { descriptor_pool.allocate( l.descriptor_set_layout, static_cast<uint32_t>( s.images.size() ) ) }
@@ -49,14 +50,7 @@ Resources::Resources( Device& d, Swapchain& s, PipelineLayout& l )
 
 void Renderer::add( const Rect& rect )
 {
-	std::vector<const Dot*> dots = {
-		&rect.a, &rect.b,
-		&rect.b, &rect.c,
-		&rect.c, &rect.d,
-		&rect.d, &rect.a
-	};
-
-	// Upload dots
+	// Find Vulkan resources associated to this rect
 	auto it = rect_resources.find( &rect );
 	if ( it == std::end( rect_resources ) )
 	{
@@ -70,13 +64,16 @@ void Renderer::add( const Rect& rect )
 		}
 	}
 
-	uint32_t vertex_count = 8;
+	// Vertices
 	auto& vertex_buffer = it->second.vertex_buffer;
-	vertex_buffer.set_vertex_count( 8 );
-	for (uint32_t i = 0; i < vertex_count; ++i )
-	{
-		vertex_buffer.upload( reinterpret_cast<const uint8_t*>( dots[i] ), i );
-	}
+	vertex_buffer.set_count( rect.dots.size() );
+	vertex_buffer.upload( reinterpret_cast<const uint8_t*>( rect.dots.data() ) );
+
+	// Indices
+	auto& index_buffer = it->second.index_buffer;
+	index_buffer.set_count( rect.indices.size() );
+	index_buffer.upload( reinterpret_cast<const uint8_t*>( rect.indices.data() ) );
 }
+
 
 } // namespace graphics

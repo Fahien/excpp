@@ -13,12 +13,12 @@ class Device;
 class Swapchain;
 class PipelineLayout;
 
-using UniformBuffer = Buffer;
 struct Resources
 {
 	Resources( Device& device, Swapchain& swapchain, PipelineLayout& l );
 
-	VertexBuffers vertex_buffer;
+	DynamicBuffer vertex_buffer;
+	DynamicBuffer index_buffer;
 	std::vector<Buffer> uniform_buffers;
 	DescriptorPool descriptor_pool;
 	std::vector<VkDescriptorSet> descriptor_sets;

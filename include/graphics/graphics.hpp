@@ -3,6 +3,7 @@
 #include <fstream>
 #include <filesystem>
 #include <functional>
+#include <array>
 
 #include <vulkan/vulkan_core.h>
 
@@ -14,6 +15,8 @@
 
 namespace graphics
 {
+
+using Index = uint16_t;
 
 
 struct alignas(16) Color
@@ -60,12 +63,12 @@ struct Rect
 	Rect( Dot bottom_left, Dot top_right );
 
 	Rect( Dot aa, Dot bb, Dot cc, Dot dd )
-	: a { aa }, b { bb }, c { cc }, d { dd } {}
+	: dots { aa, bb, cc, dd }
+	{}
 
-	Dot a = {};
-	Dot b = {};
-	Dot c = {};
-	Dot d = {};
+	std::array<Dot, 4> dots = {};
+
+	const std::array<Index, 8> indices = { 0, 1, 1, 2, 2, 3, 3, 0 };
 
 	math::Mat4 model = math::Mat4::identity;
 };
@@ -267,13 +270,16 @@ class CommandBuffer
 	void begin_render_pass( RenderPass& rp, Framebuffer& fb );
 
 	void bind_vertex_buffer( Buffer& b );
-	void bind_vertex_buffers( VertexBuffers& vbs );
+	void bind_vertex_buffers( DynamicBuffer& db );
+
+	void bind_index_buffer( DynamicBuffer& b );
 
 	void bind( GraphicsPipeline& p );
 
 	void bind_descriptor_sets( const PipelineLayout& layout, VkDescriptorSet set );
 
 	void draw( const uint32_t vertex_count = 1 );
+	void draw_indexed( const uint32_t index_count );
 
 	void end_render_pass();
 
@@ -351,10 +357,6 @@ class Graphics
 	bool render_begin();
 	void render_end();
 
-	void draw();
-	void draw( const std::vector<const Dot*>& dots );
-	void draw( const std::vector<Dot>& dots );
-	void draw( const std::vector<Line>& lines );
 	void draw( const Rect& rect );
 
 	Glfw glfw;
@@ -362,7 +364,7 @@ class Graphics
 	Glfw::Window window;
 	Glfw::Window::Surface surface;
 	const char* swapchain_extension_name = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-	RequiredExtensions device_required_extensions { 1, &swapchain_extension_name };
+	RequiredExtensions device_required_extensions = { 1, &swapchain_extension_name };
 	Device device;
 	Swapchain swapchain;
 
