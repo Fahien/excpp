@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <cmath>
 
 namespace graphics
 {
@@ -1126,12 +1127,88 @@ void Graphics::render_end()
 	present_queue.present( { swapchain.handle }, { current_frame_index }, { image_drawn.handle } );
 }
 
-
-void Graphics::draw( const Triangle& rect )
+math::Mat4 perspective( const float a, const float y, const float f, const float n )
 {
-	auto& resources = renderer.triangle_resources.find( &rect )->second;
+	math::Mat4 proj = {};
 
-	auto data = reinterpret_cast<const uint8_t*>( &rect.model.matrix );
+	// Calculate projection matrix
+	float cotfov = 1.0f / std::tan( 0.5f * y );
+	proj[0] = cotfov / a;
+	proj[5] = cotfov;
+	proj[10] = -( n + f ) / ( f - n );
+	proj[14] = -2.0f * n * f / ( f - n );
+	proj[11] = -1.0f;
+
+	return proj;
+}
+
+
+math::Mat4 look_at( const math::Vec3& eye, const math::Vec3& center, math::Vec3 up )
+{
+	math::Vec3 forward = eye - center;
+	forward.normalize();
+
+	math::Vec3 right = math::Vec3::cross( up, forward );
+	right.normalize();
+
+	up = math::Vec3::cross( forward, right );
+	up.normalize();
+
+	math::Mat4 matrix = {};
+
+	matrix[0] = right.x;
+	matrix[4] = right.y;
+	matrix[8] = right.z;
+	matrix[12] = -math::Vec3::dot( right, eye );
+	matrix[1] = up.x;
+	matrix[5] = up.y;
+	matrix[9] = up.z;
+	matrix[13] = -math::Vec3::dot( up, eye );
+	matrix[2] = forward.x;
+	matrix[6] = forward.y;
+	matrix[10] = forward.z;
+	matrix[14] = -math::Vec3::dot( forward, eye );
+	matrix[3] = 0;
+	matrix[7] = 0;
+	matrix[11] = 0;
+	matrix[15] = 1.0f;
+
+	return matrix;
+}
+
+math::Mat4 ortho( float left, float right, float bottom, float top, float near, float far )
+{
+	math::Vec3 mid;
+	mid.x = ( left + right ) / ( right - left );
+	mid.y = ( bottom + top ) / ( bottom - top );
+	mid.z = near / ( near - far );
+
+	math::Vec3 scale;
+	scale.x = 2.0f / ( right - left );
+	scale.y = 2.0f / ( bottom - top );
+	scale.z = 1.0f / ( near - far );
+
+	math::Mat4 mat = math::Mat4::identity;
+
+	mat[12] = -mid.x;
+	mat[13] = -mid.y;
+	mat[14] = mid.z;
+
+	mat[0] = scale.x;
+	mat[5] = -scale.y;
+	mat[10] = scale.z;
+
+	return mat;
+}
+
+void Graphics::draw( Triangle& tri )
+{
+	auto& resources = renderer.triangle_resources.find( &tri )->second;
+
+	tri.ubo.view = look_at( math::Vec3( 0.0, 0.5f, -.5 ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
+	tri.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 1.0f );
+
+	auto data = reinterpret_cast<const uint8_t*>( &tri.ubo );
 	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];
 	uniform_buffer.upload( data, sizeof( UniformBufferObject ) );
 
@@ -1145,11 +1222,14 @@ void Graphics::draw( const Triangle& rect )
 }
 
 
-void Graphics::draw( const Rect& rect )
+void Graphics::draw( Rect& rect )
 {
 	auto& resources = renderer.rect_resources.find( &rect )->second;
 
-	auto data = reinterpret_cast<const uint8_t*>( &rect.model.matrix );
+	rect.ubo.view = look_at( math::Vec3( 0.0f, 0.0f, 2.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
+	rect.ubo.proj = ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 1.0f);
+
+	auto data = reinterpret_cast<const uint8_t*>( &rect.ubo );
 	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];
 	uniform_buffer.upload( data, sizeof( UniformBufferObject ) );
 

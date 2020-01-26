@@ -3,24 +3,34 @@
 #include <cmath>
 
 #include <graphics/graphics.hpp>
-
+#include <graphics/png.h>
 
 void update( const double dt, graphics::Triangle& r )
 {
-	r.model.rotateY( math::radians( dt * 16.0 ) );
+	r.ubo.model.rotateY( math::radians( dt * 16.0 ) );
 }
 
 void update( const double dt, graphics::Rect& r )
 {
-	r.model.rotateZ( -math::radians( dt * 16.0 ) );
+	r.ubo.model.rotateZ( -math::radians( dt * 16.0 ) );
 }
 
 int main()
 {
 	using namespace graphics;
+
+	auto image = Png( "img/lena.png" );
+
+	return EXIT_SUCCESS;
+}
+
+void run()
+{
+	using namespace graphics;
+
 	auto graphics = Graphics();
-	auto square = Rect( Dot{ Point{ -0.5f, -0.5f } }, Dot{ Point{ 0.5f, 0.5f } } );
-	auto triangle = Triangle( Dot{ Point{ -0.3f, -0.3f } }, Dot{ Point{ 0.3f, -0.3f } }, Dot{ Point{ 0.0f, 0.3f } } );
+	auto square = Rect( Dot( Point( -0.5f, -0.5f ) ), Dot( Point( 0.5f, 0.5f ) ) );
+	auto triangle = Triangle( Dot( Point( -0.3f, -0.3f ) ), Dot( Point( 0.3f, -0.3f ) ), Dot( Point( 0.0f, 0.3f ) ) );
 	graphics.renderer.add( square );
 	graphics.renderer.add( triangle );
 
@@ -39,6 +49,4 @@ int main()
 			graphics.render_end();
 		}
 	}
-
-	return EXIT_SUCCESS;
 }

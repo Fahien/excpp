@@ -181,6 +181,12 @@ Vec3 Vec3::cross( const Vec3& a, const Vec3& b )
 	return result;
 }
 
+float Vec3::dot( const Vec3& a, const Vec3& b )
+{
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+
 
 void Vec3::set( const float xx, const float yy, const float zz )
 {

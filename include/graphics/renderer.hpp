@@ -18,10 +18,15 @@ struct Resources
 {
 	Resources( Device& device, Swapchain& swapchain, PipelineLayout& l );
 
+	// Vertices and indices do not change, hence one is enough
 	DynamicBuffer vertex_buffer;
 	DynamicBuffer index_buffer;
+
+	// Uniform buffer for each swapchain image
 	std::vector<Buffer> uniform_buffers;
+
 	DescriptorPool descriptor_pool;
+	// Descriptor sets for each swapchain image
 	std::vector<VkDescriptorSet> descriptor_sets;
 };
 

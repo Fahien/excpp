@@ -77,6 +77,7 @@ class Vec3
 	Vec3( Vec3&& other );
 
 	static Vec3 cross( const Vec3& a, const Vec3& b );
+	static float dot( const Vec3& a, const Vec3& b );
 
 	void set( const float xx, const float yy, const float zz );
 	void normalize();

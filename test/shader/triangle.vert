@@ -2,6 +2,8 @@
 
 layout( binding = 0 ) uniform UniformBufferObject {
 	mat4 model;
+	mat4 view;
+	mat4 proj;
 } ubo;
 
 layout( location = 0 ) in vec3 in_position;
@@ -13,5 +15,5 @@ void main()
 {
 	gl_PointSize = 8.0;
 	out_color = in_color;
-	gl_Position = ubo.model * vec4(in_position, 1.0);
+	gl_Position = ubo.proj * ubo.view * ubo.model * vec4(in_position, 1.0);
 }

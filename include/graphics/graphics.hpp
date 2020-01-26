@@ -49,6 +49,13 @@ struct alignas(16) Dot
 	Color c = {};
 };
 
+struct alignas(16) UniformBufferObject
+{
+	math::Mat4 model = math::Mat4::identity;
+	math::Mat4 view  = math::Mat4::identity;
+	math::Mat4 proj  = math::Mat4::identity;
+};
+
 
 struct Triangle
 {
@@ -60,7 +67,7 @@ struct Triangle
 
 	const std::array<Index, 6> indices = { 0, 1, 1, 2, 2, 0 };
 
-	math::Mat4 model = math::Mat4::identity;
+	UniformBufferObject ubo;
 };
 
 
@@ -76,14 +83,9 @@ struct Rect
 
 	const std::array<Index, 8> indices = { 0, 1, 1, 2, 2, 3, 3, 0 };
 
-	math::Mat4 model = math::Mat4::identity;
+	UniformBufferObject ubo;
 };
 
-
-struct alignas(16) UniformBufferObject
-{
-	math::Mat4 model;
-};
 
 
 template<typename T>
@@ -363,8 +365,8 @@ class Graphics
 	bool render_begin();
 	void render_end();
 
-	void draw( const Triangle& tri );
-	void draw( const Rect& rect );
+	void draw( Triangle& tri );
+	void draw( Rect& rect );
 
 	Glfw glfw;
 	Instance instance;

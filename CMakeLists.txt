@@ -6,14 +6,16 @@ list( APPEND CMAKE_MODULE_PATH
 	${CMAKE_CURRENT_SOURCE_DIR}/cmake )
 
 find_package( Vulkan )
-message( STATUS ${Vulkan_INCLUDE_DIRS} )
 find_package( GLFW )
+find_package( PNG )
 include(compile_shaders)
 
 # Lib
-set( SOURCES 
+set( SOURCES
+	${CMAKE_CURRENT_SOURCE_DIR}/src/png.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/buffers.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/descriptors.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/image.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/graphics.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/glfw.cpp
@@ -23,7 +25,7 @@ add_library( ${PROJECT_NAME} ${SOURCES} )
 target_include_directories( ${PROJECT_NAME} PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/include
 	${Vulkan_INCLUDE_DIRS} )
-target_link_libraries( ${PROJECT_NAME} ${Vulkan_LIBRARIES} ${GLFW_LIBRARY} )
+target_link_libraries( ${PROJECT_NAME} ${Vulkan_LIBRARIES} ${GLFW_LIBRARY} PNG::PNG )
 target_compile_features( ${PROJECT_NAME} PUBLIC cxx_std_17 )
 
 # Test
