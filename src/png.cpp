@@ -9,6 +9,7 @@
 #include <thread>
 #include <chrono>
 
+#include "graphics/graphics.hpp"
 
 namespace graphics
 {
@@ -38,7 +39,7 @@ void read_status( png_struct* png, uint32_t row, int pass )
 
 	// TODO: remove
 	using namespace std::chrono_literals;
-	std::this_thread::sleep_for( 1ms );
+	//std::this_thread::sleep_for( 1ms );
 }
 
 
@@ -66,19 +67,19 @@ void Png::print_info()
 
 Png::Png( const std::string& path )
 {
-	png_struct* png = png_create_read_struct( PNG_LIBPNG_VER_STRING, this, handle_error, handle_warning );
+	png = png_create_read_struct( PNG_LIBPNG_VER_STRING, this, handle_error, handle_warning );
 	assert( png && "Cannot create PNG read" );
 
-	png_info* info = png_create_info_struct( png );
+	info = png_create_info_struct( png );
 	assert( info && "Cannot create PNG info" );
 	
-	png_info* end = png_create_info_struct( png );
+	end = png_create_info_struct( png );
 	assert( end && "Cannot create PNG end info" );
 
 	auto res = setjmp( png_jmpbuf( png ) );
 	assert( !res && "Cannot set PNG jump" );
 
-	auto file = std::fopen( path.c_str(), "rb" );
+	file = std::fopen( path.c_str(), "rb" );
 	assert( file && "Cannot open png file" );
 
 	png_init_io( png, file );
@@ -101,29 +102,38 @@ Png::Png( const std::string& path )
 	channels = png_get_channels( png, info );
 
 	print_info();
+}
 
+
+size_t Png::get_size() const
+{
+	return width * height * channels;
+}
+
+
+void Png::load( png_byte* bytes )
+{
 	// Allocate memory to store bytes of the image
-	size_t byte_count = width * height * channels;
-	bytes.resize( byte_count );
+	size_t byte_count = get_size();
 
 	// Allocate memory to store pointers to rows
 	rows.resize( height );
 	for( uint32_t i = 0; i < height; ++i )
 	{
 		size_t offset = width * channels * i;
-		rows[i] = bytes.data() + offset;
+		rows[i] = bytes + offset;
 	}
 
 	png_read_image( png, rows.data() );
 	png_read_end( png, info );
 	std::printf("\n");
 
-	png_destroy_read_struct( &png, &info, &end );
-	std::fclose( file );
 }
 
 Png::~Png()
 {
+	png_destroy_read_struct( &png, &info, &end );
+	std::fclose( file );
 }
 
 } // namespace graphics

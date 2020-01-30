@@ -7,6 +7,8 @@
 namespace graphics
 {
 
+class Device;
+
 class Png
 {
   public:
@@ -14,6 +16,16 @@ class Png
 	~Png();
 
 	void print_info();
+
+	size_t get_size() const;
+
+	void load( png_byte* bytes );
+
+	png_struct* png = nullptr;
+	png_info* info = nullptr;
+	png_info* end = nullptr;
+
+	FILE* file = nullptr;
 
 	uint32_t width;
 	uint32_t height;
@@ -26,7 +38,6 @@ class Png
 
 	png_byte channels;
 
-	std::vector<png_byte> bytes;
 	std::vector<png_byte*> rows;
 };
 

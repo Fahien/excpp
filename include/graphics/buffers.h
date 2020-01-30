@@ -19,6 +19,9 @@ class Buffer
 	Buffer( Buffer&& o );
 	Buffer& operator=( Buffer&& o );
 
+	void* map( VkDeviceSize size );
+	void unmap();
+
 	void upload( const uint8_t* data, VkDeviceSize size );
 
 	Device& device;

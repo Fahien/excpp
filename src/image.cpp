@@ -25,15 +25,14 @@ VkFormat get_format( Png& png )
 
 Image::Image( Device& d, Png& png )
 : device { d }
+, extent { png.width, png.height, 1 }
 , format { get_format( png ) }
 {
 	// Image
 	VkImageCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	info.imageType = VK_IMAGE_TYPE_2D;
-	info.extent.width = png.width;
-	info.extent.height = png.height;
-	info.extent.depth = 1;
+	info.extent = extent;
 	info.mipLevels = 1;
 	info.arrayLayers = 1;
 	info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -79,6 +78,7 @@ Image::~Image()
 
 Image::Image( Image&& other )
 : device { other.device }
+, extent { other.extent }
 , format { other.format }
 , handle { other.handle }
 , memory { other.memory }
@@ -91,11 +91,30 @@ Image::Image( Image&& other )
 Image& Image::operator=( Image&& other )
 {
 	assert( device.handle == other.device.handle && "Cannot move images from different device" );
+	std::swap( extent, other.extent );
 	std::swap( format, other.format );
 	std::swap( handle, other.handle );
 	std::swap( memory, other.memory );
 
 	return *this;
+}
+
+
+/// TODO: finish this method
+void Image::upload( Buffer& buffer )
+{
+	VkBufferImageCopy region = {};
+	region.bufferOffset = 0;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
+
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+
+	region.imageOffset = {0, 0, 0};
+	region.imageExtent = extent;
 }
 
 

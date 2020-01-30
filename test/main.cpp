@@ -51,6 +51,14 @@ void run()
 	using namespace graphics;
 
 	auto graphics = Graphics();
+
+	auto image = Png( "img/lena.png" );
+	auto image_size = image.get_size();
+	auto staging_buffer = Buffer( graphics.device, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT );
+	auto mem = reinterpret_cast<png_byte*>( staging_buffer.map( image_size ) );
+	image.load( mem );
+	staging_buffer.unmap();
+
 	auto quad = create_quad();
 	auto square = Rect( Dot( Point( -0.5f, -0.5f ) ), Dot( Point( 0.5f, 0.5f ) ) );
 	auto triangle = Triangle( Dot( Point( -0.3f, -0.3f ) ), Dot( Point( 0.3f, -0.3f ) ), Dot( Point( 0.0f, 0.3f ) ) );

@@ -7,6 +7,7 @@ namespace graphics
 
 class Device;
 class Png;
+class Buffer;
 
 class Image
 {
@@ -17,7 +18,10 @@ class Image
 	Image( Image&& o );
 	Image& operator=( Image&& o );
 
+	void upload( Buffer& b );
+
 	Device& device;
+	VkExtent3D extent = {};
 	VkFormat format = VK_FORMAT_UNDEFINED;
 
 	VkImage handle = VK_NULL_HANDLE;

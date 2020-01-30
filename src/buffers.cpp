@@ -75,12 +75,25 @@ Buffer& Buffer::operator=( Buffer&& o )
 }
 
 
+void* Buffer::map( const VkDeviceSize size )
+{
+	void* mem;
+	vkMapMemory( device.handle, memory, 0, size, 0, &mem);
+	return mem;
+}
+
+
+void Buffer::unmap()
+{
+	vkUnmapMemory( device.handle, memory );
+}
+
+
 void Buffer::upload( const uint8_t* data, const VkDeviceSize size )
 {
-	void* temp;
-	vkMapMemory( device.handle, memory, 0, size, 0, &temp);
+	void* temp = map( size );
 	std::memcpy( temp, data, size );
-	vkUnmapMemory( device.handle, memory );
+	unmap();
 }
 
 
