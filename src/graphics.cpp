@@ -1040,6 +1040,7 @@ Graphics::Graphics()
 , scissor { create_scissor( window ) }
 , line_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_LINE_LIST }
 , dot_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST }
+, mesh_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST }
 , renderer { device, swapchain, layout }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
@@ -1205,8 +1206,8 @@ void Graphics::draw( Triangle& tri )
 {
 	auto& resources = renderer.triangle_resources.find( &tri )->second;
 
-	tri.ubo.view = look_at( math::Vec3( 0.0, 0.5f, -.5 ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
-	tri.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 1.0f );
+	tri.ubo.view = look_at( math::Vec3( 0.0, 0.0f, 1.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
+	tri.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 2.0f );
 
 	auto data = reinterpret_cast<const uint8_t*>( &tri.ubo );
 	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];
@@ -1226,8 +1227,8 @@ void Graphics::draw( Rect& rect )
 {
 	auto& resources = renderer.rect_resources.find( &rect )->second;
 
-	rect.ubo.view = look_at( math::Vec3( 0.0f, 0.0f, 2.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
-	rect.ubo.proj = ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 1.0f);
+	rect.ubo.view = look_at( math::Vec3( 0.0f, 0.0f, 1.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
+	rect.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 1.0f );
 
 	auto data = reinterpret_cast<const uint8_t*>( &rect.ubo );
 	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];
@@ -1241,6 +1242,31 @@ void Graphics::draw( Rect& rect )
 	current_command_buffer->bind_descriptor_sets( layout, descriptor_set );
 	current_command_buffer->draw_indexed( resources.index_buffer.count() );
 }
+
+
+void Graphics::draw( Mesh& mesh )
+{
+	auto pair = renderer.mesh_resources.find( &mesh );
+	assert( pair != std::end( renderer.mesh_resources ) && "Cannot find resources for a mesh" );
+
+	auto& resources = pair->second;
+
+	mesh.ubo.view = look_at( math::Vec3( 0.0f, 0.0f, 2.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
+	mesh.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 2.0f );
+
+	auto data = reinterpret_cast<const uint8_t*>( &mesh.ubo );
+	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];
+	uniform_buffer.upload( data, sizeof( UniformBufferObject ) );
+
+	current_command_buffer->bind( mesh_pipeline );
+	current_command_buffer->bind_vertex_buffers( resources.vertex_buffer );
+	current_command_buffer->bind_index_buffer( resources.index_buffer );
+
+	auto& descriptor_set = resources.descriptor_sets[current_frame_index];
+	current_command_buffer->bind_descriptor_sets( layout, descriptor_set );
+	current_command_buffer->draw_indexed( resources.index_buffer.count() );
+}
+
 
 
 } // namespace graphics

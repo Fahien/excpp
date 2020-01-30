@@ -67,7 +67,7 @@ struct Triangle
 
 	const std::array<Index, 6> indices = { 0, 1, 1, 2, 2, 0 };
 
-	UniformBufferObject ubo;
+	UniformBufferObject ubo = {};
 };
 
 
@@ -83,9 +83,18 @@ struct Rect
 
 	const std::array<Index, 8> indices = { 0, 1, 1, 2, 2, 3, 3, 0 };
 
-	UniformBufferObject ubo;
+	UniformBufferObject ubo = {};
 };
 
+
+struct Mesh
+{
+	std::vector<Dot> dots = {};
+
+	std::vector<Index> indices = {};
+
+	UniformBufferObject ubo = {};
+};
 
 
 template<typename T>
@@ -367,6 +376,7 @@ class Graphics
 
 	void draw( Triangle& tri );
 	void draw( Rect& rect );
+	void draw( Mesh& mesh );
 
 	Glfw glfw;
 	Instance instance;
@@ -388,6 +398,7 @@ class Graphics
 
 	GraphicsPipeline line_pipeline;
 	GraphicsPipeline dot_pipeline;
+	GraphicsPipeline mesh_pipeline;
 
 	Renderer renderer;
 

@@ -76,7 +76,6 @@ void Renderer::add( const Triangle& rect )
 }
 
 
-
 void Renderer::add( const Rect& rect )
 {
 	// Find Vulkan resources associated to this rect
@@ -102,6 +101,34 @@ void Renderer::add( const Rect& rect )
 	auto& index_buffer = it->second.index_buffer;
 	index_buffer.set_count( rect.indices.size() );
 	index_buffer.upload( reinterpret_cast<const uint8_t*>( rect.indices.data() ) );
+}
+
+
+void Renderer::add( const Mesh& mesh )
+{
+	// Find Vulkan resources associated to this mesh
+	auto it = mesh_resources.find( &mesh );
+	if ( it == std::end( mesh_resources ) )
+	{
+		auto[new_it, ok] = mesh_resources.emplace(
+			&mesh,
+			Resources( device, swapchain, layout )
+		);
+		if (ok)
+		{
+			it = new_it;
+		}
+	}
+
+	// Vertices
+	auto& vertex_buffer = it->second.vertex_buffer;
+	vertex_buffer.set_count( mesh.dots.size() );
+	vertex_buffer.upload( reinterpret_cast<const uint8_t*>( mesh.dots.data() ) );
+
+	// Indices
+	auto& index_buffer = it->second.index_buffer;
+	index_buffer.set_count( mesh.indices.size() );
+	index_buffer.upload( reinterpret_cast<const uint8_t*>( mesh.indices.data() ) );
 }
 
 
