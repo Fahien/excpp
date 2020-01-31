@@ -2,6 +2,9 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include "graphics/commands.h"
+
+
 namespace graphics
 {
 
@@ -26,6 +29,9 @@ class Image
 
 	VkImage handle = VK_NULL_HANDLE;
 	VkDeviceMemory memory = VK_NULL_HANDLE;
+
+	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	CommandPool command_pool;
 };
 
 

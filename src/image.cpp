@@ -27,6 +27,7 @@ Image::Image( Device& d, Png& png )
 : device { d }
 , extent { png.width, png.height, 1 }
 , format { get_format( png ) }
+, command_pool { d }
 {
 	// Image
 	VkImageCreateInfo info = {};
@@ -82,6 +83,8 @@ Image::Image( Image&& other )
 , format { other.format }
 , handle { other.handle }
 , memory { other.memory }
+, layout { other.layout }
+, command_pool { std::move( other.command_pool ) }
 {
 	other.handle = VK_NULL_HANDLE;
 	other.memory = VK_NULL_HANDLE;
@@ -95,26 +98,30 @@ Image& Image::operator=( Image&& other )
 	std::swap( format, other.format );
 	std::swap( handle, other.handle );
 	std::swap( memory, other.memory );
+	std::swap( layout, other.layout );
+	std::swap( command_pool, other.command_pool );
 
 	return *this;
 }
 
 
-/// TODO: finish this method
 void Image::upload( Buffer& buffer )
 {
-	VkBufferImageCopy region = {};
-	region.bufferOffset = 0;
-	region.bufferRowLength = 0;
-	region.bufferImageHeight = 0;
+	auto cmds = command_pool.allocate_command_buffers();
+	auto& cmd = cmds[0];
 
-	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	region.imageSubresource.mipLevel = 0;
-	region.imageSubresource.baseArrayLayer = 0;
-	region.imageSubresource.layerCount = 1;
+	cmd.begin( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 
-	region.imageOffset = {0, 0, 0};
-	region.imageExtent = extent;
+	cmd.transition( *this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+	cmd.copy( buffer, *this );
+	cmd.transition( *this, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+
+	cmd.end();
+
+	auto& queue = device.find_graphics_queue();
+	auto fence = Fence( device );
+	fence.reset();
+	queue.submit( cmd, {}, {}, &fence );
 }
 
 

@@ -2,8 +2,9 @@
 #include <filesystem>
 #include <cmath>
 
-#include <graphics/graphics.hpp>
-#include <graphics/png.h>
+#include "graphics/graphics.hpp"
+#include "graphics/png.h"
+#include "graphics/image.h"
 
 void update( const double dt, graphics::Triangle& r )
 {
@@ -46,18 +47,29 @@ graphics::Mesh create_quad()
 	return quad;
 }
 
+graphics::Image load_image( graphics::Graphics& graphics, const char* path )
+{
+	using namespace graphics;
+
+	auto png = Png( path );
+	auto png_size = png.get_size();
+	auto staging_buffer = Buffer( graphics.device, png_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT );
+	auto mem = reinterpret_cast<png_byte*>( staging_buffer.map( png_size ) );
+	png.load( mem );
+	staging_buffer.unmap();
+
+	auto image = Image( graphics.device, png );
+	image.upload( staging_buffer );
+	return image;
+}
+
 void run()
 {
 	using namespace graphics;
 
 	auto graphics = Graphics();
 
-	auto image = Png( "img/lena.png" );
-	auto image_size = image.get_size();
-	auto staging_buffer = Buffer( graphics.device, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT );
-	auto mem = reinterpret_cast<png_byte*>( staging_buffer.map( image_size ) );
-	image.load( mem );
-	staging_buffer.unmap();
+	auto image = load_image( graphics, "img/lena.png" );
 
 	auto quad = create_quad();
 	auto square = Rect( Dot( Point( -0.5f, -0.5f ) ), Dot( Point( 0.5f, 0.5f ) ) );
