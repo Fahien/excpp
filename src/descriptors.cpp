@@ -8,19 +8,13 @@ namespace graphics
 {
 
 
-DescriptorSetLayout::DescriptorSetLayout( Device& d )
+DescriptorSetLayout::DescriptorSetLayout( Device& d , const std::vector<VkDescriptorSetLayoutBinding>& bindings )
 : device { d }
 {
-	VkDescriptorSetLayoutBinding binding = {};
-	binding.binding = 0;
-	binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	binding.descriptorCount = 1;
-	binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
 	VkDescriptorSetLayoutCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	info.bindingCount = 1;
-	info.pBindings = &binding;
+	info.bindingCount = bindings.size();
+	info.pBindings = bindings.data();
 
 	auto res = vkCreateDescriptorSetLayout( device.handle, &info, nullptr, &handle );
 	assert( res == VK_SUCCESS && "Cannot create descriptor set layout" );
@@ -51,18 +45,16 @@ DescriptorSetLayout& DescriptorSetLayout::operator=( DescriptorSetLayout&& o )
 }
 
 
-DescriptorPool::DescriptorPool( Device& d, const uint32_t sz )
+DescriptorPool::DescriptorPool( Device& d,
+	const std::vector<VkDescriptorPoolSize>& pool_sizes,
+	const uint32_t sz )
 : device { d }
 , size { sz }
 {
-	VkDescriptorPoolSize pool_size = {};
-	pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	pool_size.descriptorCount = size;
-
 	VkDescriptorPoolCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	info.poolSizeCount = 1;
-	info.pPoolSizes = &pool_size;
+	info.poolSizeCount = pool_sizes.size();
+	info.pPoolSizes = pool_sizes.data();
 	info.maxSets = size;
 
 	auto res = vkCreateDescriptorPool( device.handle, &info, nullptr, &handle );

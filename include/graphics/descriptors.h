@@ -12,7 +12,7 @@ class Device;
 class DescriptorSetLayout
 {
   public:
-	DescriptorSetLayout( Device& d );
+	DescriptorSetLayout( Device& d, const std::vector<VkDescriptorSetLayoutBinding>& bindings );
 	~DescriptorSetLayout();
 
 	DescriptorSetLayout( DescriptorSetLayout&& o );
@@ -28,7 +28,9 @@ class DescriptorPool
 {
   public:
 	/// @param size Size of the pool, number of descriptors available
-	DescriptorPool( Device& d, uint32_t size );
+	DescriptorPool( Device& d,
+		const std::vector<VkDescriptorPoolSize>& pool_sizes,
+		uint32_t size );
 	~DescriptorPool();
 
 	DescriptorPool( DescriptorPool&& o );

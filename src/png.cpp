@@ -5,10 +5,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-// TODO: remove
-#include <thread>
-#include <chrono>
-
 #include "graphics/graphics.hpp"
 
 namespace graphics
@@ -36,10 +32,6 @@ void read_status( png_struct* png, uint32_t row, int pass )
 	uint32_t percent = row * 100.0f / obj->height;
 	std::fprintf( stdout, "\rRead\t%u%%", percent );
 	std::fflush( stdout );
-
-	// TODO: remove
-	using namespace std::chrono_literals;
-	//std::this_thread::sleep_for( 1ms );
 }
 
 

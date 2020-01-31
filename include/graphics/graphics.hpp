@@ -50,6 +50,26 @@ struct alignas(16) Dot
 	Color c = {};
 };
 
+
+struct alignas(16) Coord
+{
+	Coord( float xx = 0.0f, float yy = 0.0f ) : x { xx }, y { yy } {}
+
+	float x = 0.0f;
+	float y = 0.0f;
+};
+
+
+struct alignas(16) Vertex
+{
+	Vertex( Point pp = {}, Color cc = { 1.0f, 1.0f, 1.0f, 1.0f }, Coord tc = {} ) : p { pp }, c { cc }, t { tc } {}
+
+	Point p = {};
+	Color c = {};
+	Coord t = {};
+};
+
+
 struct alignas(16) UniformBufferObject
 {
 	math::Mat4 model = math::Mat4::identity;
@@ -90,11 +110,13 @@ struct Rect
 
 struct Mesh
 {
-	std::vector<Dot> dots = {};
+	std::vector<Vertex> vertices = {};
 
 	std::vector<Index> indices = {};
 
 	UniformBufferObject ubo = {};
+
+	ImageView* image_view = nullptr;
 };
 
 
@@ -272,8 +294,6 @@ class Swapchain
 	void destroy_views();
 };
 
-class GraphicsPipeline;
-class PipelineLayout;
 
 class ShaderModule
 {
@@ -292,7 +312,7 @@ class ShaderModule
 class PipelineLayout
 {
   public:
-	PipelineLayout( Device& d );
+	PipelineLayout( Device& d, const std::vector<VkDescriptorSetLayoutBinding>& bindings );
 	~PipelineLayout();
 
 	Device& device;
@@ -306,6 +326,8 @@ class GraphicsPipeline
 {
   public:
 	GraphicsPipeline(
+		VkVertexInputBindingDescription bindings,
+		const std::vector<VkVertexInputAttributeDescription>& attributes,
 		PipelineLayout& layout,
 		ShaderModule& vert,
 		ShaderModule& frag,
@@ -345,9 +367,13 @@ class Graphics
 
 	RenderPass render_pass;
 
-	ShaderModule vert;
-	ShaderModule frag;
-	PipelineLayout layout;
+	ShaderModule line_vert;
+	ShaderModule line_frag;
+	PipelineLayout line_layout;
+
+	ShaderModule mesh_vert;
+	ShaderModule mesh_frag;
+	PipelineLayout mesh_layout;
 
 	VkViewport viewport = {};
 	VkRect2D   scissor  = {};

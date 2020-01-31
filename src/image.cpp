@@ -173,4 +173,59 @@ ImageView& ImageView::operator=( ImageView&& other )
 }
 
 
+Sampler::Sampler( Device& d )
+: device { d }
+{
+	VkSamplerCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	info.magFilter = VK_FILTER_LINEAR;
+	info.minFilter = VK_FILTER_LINEAR;
+
+	info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	info.anisotropyEnable = VK_TRUE;
+	info.maxAnisotropy = 16;
+
+	info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	info.unnormalizedCoordinates = VK_FALSE;
+
+	info.compareEnable = VK_FALSE;
+	info.compareOp = VK_COMPARE_OP_ALWAYS;
+
+	info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	info.mipLodBias = 0.0f;
+	info.minLod = 0.0f;
+	info.maxLod = 0.0f;
+
+	auto res = vkCreateSampler( device.handle, &info, nullptr, &handle );
+	assert( res == VK_SUCCESS && "Cannot create sampler" );
+}
+
+
+Sampler::~Sampler()
+{
+	if ( handle != VK_NULL_HANDLE )
+	{
+		vkDestroySampler( device.handle, handle, nullptr );
+	}
+}
+
+
+Sampler::Sampler( Sampler&& other )
+: device { other.device }
+, handle { other.handle }
+{
+	other.handle = VK_NULL_HANDLE;
+}
+
+
+Sampler& Sampler::operator=( Sampler&& other )
+{
+	assert( device.handle == other.device.handle && "Cannot move sampler from different device" );
+	std::swap( handle, other.handle );
+	return *this;
+}
+
 } // namespace graphics

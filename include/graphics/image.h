@@ -51,4 +51,18 @@ class ImageView
 };
 
 
+class Sampler
+{
+  public:
+	Sampler( Device& d );
+	~Sampler();
+
+	Sampler( Sampler&& o );
+	Sampler& operator=( Sampler&& o );
+
+	Device& device;
+	VkSampler handle = VK_NULL_HANDLE;
+};
+
+
 } // namespace graphics

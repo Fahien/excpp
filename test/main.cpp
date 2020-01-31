@@ -35,14 +35,31 @@ graphics::Mesh create_quad()
 
 	Mesh quad;
 
-	quad.dots = {
-		Dot( Point( -0.5f, -0.5f ), Color( 0.3f, 0.0f, 0.0f, 0.5f ) ),
-		Dot( Point( 0.5f, -0.5f ), Color( 0.0f, 0.3f, 0.0f, 0.5f ) ),
-		Dot( Point( -0.5f, 0.5f ), Color( 0.3f, 0.0f, 0.3f, 0.5f ) ),
-		Dot( Point( 0.5f, 0.5f ), Color( 0.0f, 0.0f, 0.3f, 0.5f ) )
+	quad.vertices = {
+		Vertex(
+			Point( -0.5f, -0.5f, 0.0f ),
+			Color( 0.3f, 0.0f, 0.0f, 0.5f ),
+			Coord( 0.0f, 1.0 ) // a
+		),
+		Vertex(
+			Point( 0.5f, -0.5f, 0.0f ),
+			Color( 0.0f, 0.3f, 0.0f, 0.5f ),
+			Coord( 1.0f, 1.0 ) // b
+		),
+		Vertex(
+			Point( -0.5f, 0.5f, 0.0f ),
+			Color( 0.3f, 0.0f, 0.3f, 0.5f ),
+			Coord( 0.0f, 0.0 )  // d
+		),
+		Vertex(
+			Point( 0.5f, 0.5f, 0.0f ),
+			Color( 0.0f, 0.0f, 0.3f, 0.5f ),
+			Coord( 1.0f, 0.0 ) // c
+		),
 	};
 
-	quad.indices = { 0, 1, 2, 3, 2, 1 };
+	// Currently, counterclockwise?
+	quad.indices = { 0, 2, 1, 1, 2, 3 };
 
 	return quad;
 }
@@ -70,8 +87,11 @@ void run()
 	auto graphics = Graphics();
 
 	auto image = load_image( graphics, "img/lena.png" );
+	auto view = ImageView( graphics.device, image );
 
 	auto quad = create_quad();
+	quad.image_view = &view;
+
 	auto square = Rect( Dot( Point( -0.5f, -0.5f ) ), Dot( Point( 0.5f, 0.5f ) ) );
 	auto triangle = Triangle( Dot( Point( -0.3f, -0.3f ) ), Dot( Point( 0.3f, -0.3f ) ), Dot( Point( 0.0f, 0.3f ) ) );
 	graphics.renderer.add( square );
@@ -84,8 +104,8 @@ void run()
 		auto dt = graphics.glfw.get_delta();
 
 		update(dt, triangle);
-		update_rect(dt, square.ubo);
-		update_rect(dt, quad.ubo);
+		//update_rect(dt, square.ubo);
+		//update_rect(dt, quad.ubo);
 
 		if ( graphics.render_begin() )
 		{
@@ -95,4 +115,6 @@ void run()
 			graphics.render_end();
 		}
 	}
+
+	graphics.device.wait_idle();
 }

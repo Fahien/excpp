@@ -26,12 +26,12 @@ Rect::Rect( Dot bottom_left, Dot top_right )
 }
 
 
-template <>
-VkVertexInputBindingDescription get_bindings<Dot>()
+template <typename T>
+VkVertexInputBindingDescription get_bindings()
 {
 	VkVertexInputBindingDescription bindings = {};
 	bindings.binding = 0;
-	bindings.stride = sizeof( Dot );
+	bindings.stride = sizeof( T );
 	bindings.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	return bindings;
 }
@@ -51,6 +51,29 @@ std::vector<VkVertexInputAttributeDescription> get_attributes<Dot>()
 	attributes[1].location = 1;
 	attributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	attributes[1].offset = offsetof( Dot, c );
+
+	return attributes;
+}
+
+template <>
+std::vector<VkVertexInputAttributeDescription> get_attributes<Vertex>()
+{
+	std::vector<VkVertexInputAttributeDescription> attributes( 3 );
+
+	attributes[0].binding = 0;
+	attributes[0].location = 0;
+	attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attributes[0].offset = offsetof( Vertex, p );
+
+	attributes[1].binding = 0;
+	attributes[1].location = 1;
+	attributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	attributes[1].offset = offsetof( Vertex, c );
+
+	attributes[2].binding = 0;
+	attributes[2].location = 2;
+	attributes[2].format = VK_FORMAT_R32G32_SFLOAT;
+	attributes[2].offset = offsetof( Vertex, t );
 
 	return attributes;
 }
@@ -197,6 +220,8 @@ Device::Device( PhysicalDevice& d, const VkSurfaceKHR s, const RequiredExtension
 
 	// Features
 	VkPhysicalDeviceFeatures features = {};
+	features.samplerAnisotropy = VK_TRUE;
+
 	info.pEnabledFeatures = &features;
 
 	// Extensions
@@ -683,9 +708,9 @@ ShaderModule& ShaderModule::operator=( ShaderModule&& other )
 }
 
 
-PipelineLayout::PipelineLayout( Device& d )
+PipelineLayout::PipelineLayout( Device& d, const std::vector<VkDescriptorSetLayoutBinding>& bindings )
 : device { d }
-, descriptor_set_layout { d }
+, descriptor_set_layout { d, std::move( bindings ) }
 {
 	VkPipelineLayoutCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -704,8 +729,9 @@ PipelineLayout::~PipelineLayout()
 }
 
 
-
 GraphicsPipeline::GraphicsPipeline(
+	VkVertexInputBindingDescription bindings,
+	const std::vector<VkVertexInputAttributeDescription>& attributes,
 	PipelineLayout& layout,
 	ShaderModule& vert,
 	ShaderModule& frag,
@@ -718,9 +744,7 @@ GraphicsPipeline::GraphicsPipeline(
 	VkPipelineVertexInputStateCreateInfo input_info = {};
 	input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	input_info.vertexBindingDescriptionCount = 1;
-	auto bindings = get_bindings<Dot>();
 	input_info.pVertexBindingDescriptions = &bindings;
-	auto attributes = get_attributes<Dot>();
 	input_info.vertexAttributeDescriptionCount = attributes.size();
 	input_info.pVertexAttributeDescriptions = attributes.data();
 
@@ -881,23 +905,79 @@ VkRect2D create_scissor( const Glfw::Window& window )
 }
 
 
+std::vector<VkDescriptorSetLayoutBinding> get_line_bindings()
+{
+	VkDescriptorSetLayoutBinding binding = {};
+	binding.binding = 0;
+	binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	binding.descriptorCount = 1;
+	binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	return { binding };
+}
+
+
+std::vector<VkDescriptorSetLayoutBinding> get_mesh_bindings()
+{
+	VkDescriptorSetLayoutBinding ubo_binding = {};
+	ubo_binding.binding = 0;
+	ubo_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	ubo_binding.descriptorCount = 1;
+	ubo_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	VkDescriptorSetLayoutBinding sampler_binding = {};
+	sampler_binding.binding = 1;
+	sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	sampler_binding.descriptorCount = 1;
+	sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	return { ubo_binding, sampler_binding };
+}
+
+
 Graphics::Graphics()
 : instance { glfw.required_extensions, get_validation_layers() }
 , surface { instance, window }
 , device { instance.physical_devices.at( 0 ), surface.handle, device_required_extensions }
 , swapchain { device }
 , render_pass { swapchain }
-, vert { device, "vert.spv" }
-, frag { device, "frag.spv" }
-//, point_vert { device, "point.vert.spv" }
-//, point_frag { device, "point.frag.spv" }
-, layout { device }
+, line_vert { device, "line.vert.spv" }
+, line_frag { device, "line.frag.spv" }
+, line_layout { device, get_line_bindings() }
+, mesh_vert { device, "mesh.vert.spv" }
+, mesh_frag { device, "mesh.frag.spv" }
+, mesh_layout { device, get_mesh_bindings() }
 , viewport { create_viewport( window ) }
 , scissor { create_scissor( window ) }
-, line_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_LINE_LIST }
-, dot_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST }
-, mesh_pipeline { layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST }
-, renderer { device, swapchain, layout }
+, line_pipeline {
+	get_bindings<Dot>(),
+	get_attributes<Dot>(),
+	line_layout,
+	line_vert,
+	line_frag,
+	render_pass,
+	viewport,
+	scissor,
+	VK_PRIMITIVE_TOPOLOGY_LINE_LIST }
+, dot_pipeline {
+	get_bindings<Dot>(),
+	get_attributes<Dot>(),
+	line_layout,
+	line_vert,
+	line_frag,
+	render_pass,
+	viewport,
+	scissor,
+	VK_PRIMITIVE_TOPOLOGY_POINT_LIST }
+, mesh_pipeline {
+	get_bindings<Vertex>(),
+	get_attributes<Vertex>(),
+	mesh_layout,
+	mesh_vert,
+	mesh_frag,
+	render_pass,
+	viewport, scissor }
+, renderer { device, swapchain, line_layout, mesh_layout }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
 , framebuffers { swapchain.create_framebuffers( render_pass ) }
@@ -940,8 +1020,33 @@ bool Graphics::render_begin()
 		viewport.height = window.extent.height;
 		scissor.extent = window.extent;
 
-		dot_pipeline = GraphicsPipeline( layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST );
-		line_pipeline  = GraphicsPipeline( layout, vert, frag, render_pass, viewport, scissor, VK_PRIMITIVE_TOPOLOGY_LINE_LIST );
+		dot_pipeline = GraphicsPipeline(
+			get_bindings<Dot>(),
+			get_attributes<Dot>(),
+			line_layout,
+			line_vert,
+			line_frag,
+			render_pass,
+			viewport,
+			scissor, VK_PRIMITIVE_TOPOLOGY_POINT_LIST );
+		line_pipeline = GraphicsPipeline(
+			get_bindings<Dot>(),
+			get_attributes<Dot>(),
+			line_layout,
+			line_vert,
+			line_frag,
+			render_pass,
+			viewport,
+			scissor, VK_PRIMITIVE_TOPOLOGY_LINE_LIST );
+		mesh_pipeline = GraphicsPipeline(
+			get_bindings<Vertex>(),
+			get_attributes<Vertex>(),
+			mesh_layout,
+			mesh_vert,
+			mesh_frag,
+			render_pass,
+			viewport,
+			scissor );
 
 		framebuffers = swapchain.create_framebuffers( render_pass );
 
@@ -1052,7 +1157,7 @@ math::Mat4 ortho( float left, float right, float bottom, float top, float near, 
 	mat[14] = mid.z;
 
 	mat[0] = scale.x;
-	mat[5] = -scale.y;
+	mat[5] = scale.y;
 	mat[10] = scale.z;
 
 	return mat;
@@ -1074,7 +1179,7 @@ void Graphics::draw( Triangle& tri )
 	current_command_buffer->bind_index_buffer( resources.index_buffer );
 
 	auto& descriptor_set = resources.descriptor_sets[current_frame_index];
-	current_command_buffer->bind_descriptor_sets( layout, descriptor_set );
+	current_command_buffer->bind_descriptor_sets( line_layout, descriptor_set );
 	current_command_buffer->draw_indexed( resources.index_buffer.count() );
 }
 
@@ -1095,7 +1200,7 @@ void Graphics::draw( Rect& rect )
 	current_command_buffer->bind_index_buffer( resources.index_buffer );
 
 	auto& descriptor_set = resources.descriptor_sets[current_frame_index];
-	current_command_buffer->bind_descriptor_sets( layout, descriptor_set );
+	current_command_buffer->bind_descriptor_sets( line_layout, descriptor_set );
 	current_command_buffer->draw_indexed( resources.index_buffer.count() );
 }
 
@@ -1119,7 +1224,7 @@ void Graphics::draw( Mesh& mesh )
 	current_command_buffer->bind_index_buffer( resources.index_buffer );
 
 	auto& descriptor_set = resources.descriptor_sets[current_frame_index];
-	current_command_buffer->bind_descriptor_sets( layout, descriptor_set );
+	current_command_buffer->bind_descriptor_sets( mesh_layout, descriptor_set );
 	current_command_buffer->draw_indexed( resources.index_buffer.count() );
 }
 

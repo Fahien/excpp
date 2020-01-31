@@ -4,6 +4,7 @@
 
 #include "graphics/buffers.h"
 #include "graphics/descriptors.h"
+#include "graphics/image.h"
 
 namespace graphics
 {
@@ -27,6 +28,28 @@ struct Resources
 	// Uniform buffer for each swapchain image
 	std::vector<Buffer> uniform_buffers;
 
+	/// Descriptor pool for descriptor sets
+	DescriptorPool descriptor_pool;
+	// Descriptor sets for each swapchain image
+	std::vector<VkDescriptorSet> descriptor_sets;
+};
+
+
+struct MeshResources
+{
+	MeshResources( Device& device, Swapchain& swapchain, PipelineLayout& l, ImageView& image_view );
+
+	// Vertices and indices do not change, hence one is enough
+	DynamicBuffer vertex_buffer;
+	DynamicBuffer index_buffer;
+
+	// Uniform buffer for each swapchain image
+	std::vector<Buffer> uniform_buffers;
+
+	//ImageView image_view;
+	Sampler sampler;
+
+	/// Descriptor pool for descriptor sets
 	DescriptorPool descriptor_pool;
 	// Descriptor sets for each swapchain image
 	std::vector<VkDescriptorSet> descriptor_sets;
@@ -35,7 +58,7 @@ struct Resources
 class Renderer
 {
   public:
-	Renderer( Device& d, Swapchain& s, PipelineLayout& l );
+	Renderer( Device& d, Swapchain& s, PipelineLayout& line_layout, PipelineLayout& mesh_layout );
 
 	void add( const Triangle& t );
 	void add( const Rect& r );
@@ -43,7 +66,8 @@ class Renderer
 
 	Device& device;
 	Swapchain& swapchain;
-	PipelineLayout& layout;
+	PipelineLayout& line_layout;
+	PipelineLayout& mesh_layout;
 
 	/// @brief Each model will have
 	/// - vertex buffer containing constant data about its vertices
@@ -51,7 +75,7 @@ class Renderer
 	/// - DescriptorPool and DescriptorSet per swapchain image
 	std::unordered_map<const Rect*, Resources> rect_resources;
 	std::unordered_map<const Triangle*, Resources> triangle_resources;
-	std::unordered_map<const Mesh*, Resources> mesh_resources;
+	std::unordered_map<const Mesh*, MeshResources> mesh_resources;
 };
 
 }
