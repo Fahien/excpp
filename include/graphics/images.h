@@ -17,12 +17,15 @@ class Buffer;
 class Image
 {
   public:
+	/// @param p PNG file to load into the Vulkan image
 	Image( Device& d, Png& p );
+	Image( Device& d, VkExtent2D e, VkFormat f );
 	~Image();
 
 	Image( Image&& o );
 	Image& operator=( Image&& o );
 
+	void transition( const VkImageLayout l );
 	void upload( Buffer& b );
 
 	Device& device;
@@ -40,15 +43,13 @@ class Image
 class ImageView
 {
   public:
-	ImageView( Device& d, Image& i );
+	ImageView( const Image& i );
 	~ImageView();
 
 	ImageView( ImageView&& o );
 	ImageView& operator=( ImageView&& o );
 
 	Device& device;
-	Image& image;
-
 	VkImageView handle = VK_NULL_HANDLE;
 };
 

@@ -25,6 +25,14 @@ void CommandBuffer::begin( const VkCommandBufferUsageFlags usage_flags )
 	assert( ret == VK_SUCCESS && "Cannot begin command buffer" );
 }
 
+VkImageAspectFlags get_aspect_mask( const VkImageLayout layout )
+{
+	if ( layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL )
+	{
+		return VK_IMAGE_ASPECT_DEPTH_BIT;
+	}
+	return VK_IMAGE_ASPECT_COLOR_BIT;
+}
 
 void CommandBuffer::transition( Image& image, const VkImageLayout layout )
 {
@@ -35,7 +43,7 @@ void CommandBuffer::transition( Image& image, const VkImageLayout layout )
 	barrier.newLayout = layout;
 
 	barrier.image = image.handle;
-	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.aspectMask = get_aspect_mask( layout );
 	barrier.subresourceRange.baseMipLevel = 0;
 	barrier.subresourceRange.levelCount = 1;
 	barrier.subresourceRange.baseArrayLayer = 0;
@@ -61,6 +69,15 @@ void CommandBuffer::transition( Image& image, const VkImageLayout layout )
 
 		src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else if ( image.layout == VK_IMAGE_LAYOUT_UNDEFINED &&
+		layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL )
+	{
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+		src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		dst_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 	}
 	else
 	{
@@ -101,9 +118,11 @@ void CommandBuffer::begin_render_pass( RenderPass& render_pass, Framebuffer& fra
 	info.renderArea.offset = { 0, 0 };
 	info.renderArea.extent = framebuffer.extent;
 
-	VkClearValue clear = { 0.2f, 0.2f, 0.2f, 1.0f };
-	info.clearValueCount = 1;
-	info.pClearValues = &clear;
+	std::array<VkClearValue, 2> clears;
+	clears[0].color = { 0.2f, 0.2f, 0.2f, 1.0f };
+	clears[1].depthStencil = { 1.0f, 0 };
+	info.clearValueCount = clears.size();
+	info.pClearValues = clears.data();
 
 	vkCmdBeginRenderPass( handle, &info, VK_SUBPASS_CONTENTS_INLINE );
 }

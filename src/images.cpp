@@ -23,10 +23,16 @@ VkFormat get_format( Png& png )
 	return VK_FORMAT_UNDEFINED;
 }
 
+
 Image::Image( Device& d, Png& png )
+: Image { d, { png.width, png.height }, get_format( png ) }
+{}
+
+
+Image::Image( Device& d, const VkExtent2D ext, const VkFormat fmt )
 : device { d }
-, extent { png.width, png.height, 1 }
-, format { get_format( png ) }
+, extent { ext.width, ext.height, 1 }
+, format { fmt }
 , command_pool { d }
 {
 	// Image
@@ -40,6 +46,10 @@ Image::Image( Device& d, Png& png )
 	info.format = format;
 	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	if ( format == VK_FORMAT_D32_SFLOAT )
+	{
+		info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	}
 	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	info.samples = VK_SAMPLE_COUNT_1_BIT;
 
@@ -105,6 +115,22 @@ Image& Image::operator=( Image&& other )
 }
 
 
+void Image::transition( const VkImageLayout new_layout )
+{
+	auto cmds = command_pool.allocate_command_buffers();
+	auto& cmd = cmds[0];
+
+	cmd.begin( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+	cmd.transition( *this, new_layout );
+	cmd.end();
+
+	auto& queue = device.find_graphics_queue();
+	auto fence = Fence( device );
+	fence.reset();
+	queue.submit( cmd, {}, {}, &fence );
+}
+
+
 void Image::upload( Buffer& buffer )
 {
 	auto cmds = command_pool.allocate_command_buffers();
@@ -125,16 +151,28 @@ void Image::upload( Buffer& buffer )
 }
 
 
-ImageView::ImageView( Device& d , Image& i )
-: device { d }
-, image { i }
+VkImageAspectFlags get_aspect( const Image& image )
+{
+	if ( image.format == VK_FORMAT_D32_SFLOAT )
+	{
+		return VK_IMAGE_ASPECT_DEPTH_BIT;
+	}
+	else
+	{
+		return VK_IMAGE_ASPECT_COLOR_BIT;
+	}
+}
+
+
+ImageView::ImageView( const Image& image )
+: device { image.device }
 {
 	VkImageViewCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	info.image = image.handle;
 	info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	info.format = image.format;
-	info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	info.subresourceRange.aspectMask = get_aspect( image );
 	info.subresourceRange.baseMipLevel = 0;
 	info.subresourceRange.levelCount = 1;
 	info.subresourceRange.baseArrayLayer = 0;
@@ -156,7 +194,6 @@ ImageView::~ImageView()
 
 ImageView::ImageView( ImageView&& other )
 : device { other.device }
-, image { other.image }
 , handle { other.handle }
 {
 	other.handle = VK_NULL_HANDLE;
@@ -166,7 +203,6 @@ ImageView::ImageView( ImageView&& other )
 ImageView& ImageView::operator=( ImageView&& other )
 {
 	assert( device.handle == other.device.handle && "Cannot move images from different device" );
-	assert( image.handle == other.image.handle && "Cannot move image views from different images" );
 	std::swap( handle, other.handle );
 
 	return *this;
@@ -250,7 +286,7 @@ VkImageView Images::load( const char* path )
 
 		auto image = Image( device, png );
 		image.upload( staging_buffer );
-		auto view = ImageView( device, image );
+		auto view = ImageView( image );
 		ret = view.handle;
 
 		auto pair = std::make_pair( std::move( image ), std::move( view ) );

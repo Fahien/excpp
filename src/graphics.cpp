@@ -143,6 +143,14 @@ uint32_t PhysicalDevice::get_memory_type( uint32_t type_filter, VkMemoryProperty
 }
 
 
+VkFormatProperties PhysicalDevice::get_format_properties( const VkFormat format )
+{
+	VkFormatProperties props;
+	vkGetPhysicalDeviceFormatProperties( handle, format, &props );
+	return props;
+}
+
+
 Queue::Queue( const Device& d, const uint32_t family_index, const uint32_t index )
 : device { d }
 , family_index { family_index }
@@ -548,12 +556,16 @@ Swapchain::~Swapchain()
 }
 
 
-std::vector<Framebuffer> Swapchain::create_framebuffers( RenderPass& render_pass )
+std::vector<Framebuffer> Swapchain::create_framebuffers( const std::vector<ImageView>& depth_views, RenderPass& render_pass )
 {
 	std::vector<Framebuffer> framebuffers;
-	for ( auto view : views )
+	for ( size_t i = 0; i < views.size(); ++i )
 	{
-		framebuffers.emplace_back( view, extent, render_pass );
+		auto color_view = views[i];
+		auto depth_view = depth_views[i].handle;
+		std::vector<VkImageView> views = { color_view, depth_view };
+		auto framebuffer = Framebuffer( views, extent, render_pass );
+		framebuffers.emplace_back( std::move( framebuffer ) );
 	}
 	return framebuffers;
 }
@@ -595,14 +607,29 @@ RenderPass::RenderPass( Swapchain& s )
 	color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
+	VkAttachmentDescription depth_attachment = {};
+	depth_attachment.format = VK_FORMAT_D32_SFLOAT;
+	depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
 	VkAttachmentReference color_ref = {};
 	color_ref.attachment = 0;
 	color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depth_ref = {};
+	depth_ref.attachment = 1;
+	depth_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &color_ref;
+	subpass.pDepthStencilAttachment = &depth_ref;
 
 	VkSubpassDependency dependency = {};
 	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -614,11 +641,14 @@ RenderPass::RenderPass( Swapchain& s )
 	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
+	std::array<VkAttachmentDescription, 2> attachments = {
+		color_attachment, depth_attachment
+	};
 
 	VkRenderPassCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	info.attachmentCount = 1;
-	info.pAttachments = &color_attachment;
+	info.attachmentCount = attachments.size();
+	info.pAttachments = attachments.data();
 	info.subpassCount = 1;
 	info.pSubpasses = &subpass;
 	info.dependencyCount = 1;
@@ -647,15 +677,15 @@ RenderPass& RenderPass::operator=( RenderPass&& other )
 }
 
 
-Framebuffer::Framebuffer( VkImageView view, VkExtent2D& ext, RenderPass& render_pass )
+Framebuffer::Framebuffer( const std::vector<VkImageView>& views, VkExtent2D& ext, RenderPass& render_pass )
 : device { render_pass.device }
 , extent { ext }
 {
 	VkFramebufferCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	info.renderPass = render_pass.handle;
-	info.attachmentCount = 1;
-	info.pAttachments = &view;
+	info.attachmentCount = views.size();
+	info.pAttachments = views.data();
 	info.width = extent.width;
 	info.height = extent.height;
 	info.layers = 1;
@@ -787,6 +817,14 @@ GraphicsPipeline::GraphicsPipeline(
 	rasterizer_info.depthBiasClamp = 0.0f;
 	rasterizer_info.depthBiasSlopeFactor = 0.0f;
 
+	VkPipelineDepthStencilStateCreateInfo depth_info = {};
+	depth_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depth_info.depthTestEnable = VK_TRUE;
+	depth_info.depthWriteEnable = VK_TRUE;
+	depth_info.depthCompareOp = VK_COMPARE_OP_LESS;
+	depth_info.depthBoundsTestEnable = VK_FALSE;
+	depth_info.stencilTestEnable = VK_FALSE;
+
 	VkPipelineMultisampleStateCreateInfo multisampling_info = {};
 	multisampling_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampling_info.sampleShadingEnable = VK_FALSE;
@@ -837,7 +875,7 @@ GraphicsPipeline::GraphicsPipeline(
 	pipeline_info.pViewportState = &viewport_info;
 	pipeline_info.pRasterizationState = &rasterizer_info;
 	pipeline_info.pMultisampleState = &multisampling_info;
-	pipeline_info.pDepthStencilState = nullptr; // Optional
+	pipeline_info.pDepthStencilState = &depth_info;
 	pipeline_info.pColorBlendState = &color_blending;
 	pipeline_info.pDynamicState = nullptr; // Optional
 
@@ -935,11 +973,40 @@ std::vector<VkDescriptorSetLayoutBinding> get_mesh_bindings()
 }
 
 
+std::vector<Image> create_depth_images( const Swapchain& swapchain )
+{
+	std::vector<Image> images;
+
+	for ( size_t i = 0; i < swapchain.images.size(); ++i )
+	{
+		auto depth = Image( swapchain.device, swapchain.extent, VK_FORMAT_D32_SFLOAT );
+		depth.transition( VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+		images.emplace_back( std::move( depth ) );
+	}
+
+	return images;
+}
+
+std::vector<ImageView> create_depth_views( const std::vector<Image>& images )
+{
+	std::vector<ImageView> views;
+
+	for( auto& image : images )
+	{
+		auto view = ImageView( image );
+		views.emplace_back( std::move( view ) );
+	}
+
+	return views;
+}
+
 Graphics::Graphics()
 : instance { glfw.required_extensions, get_validation_layers() }
 , surface { instance, window }
 , device { instance.physical_devices.at( 0 ), surface.handle, device_required_extensions }
 , swapchain { device }
+, depth_images { create_depth_images( swapchain ) }
+, depth_views { create_depth_views( depth_images ) }
 , render_pass { swapchain }
 , line_vert { device, "line.vert.spv" }
 , line_frag { device, "line.frag.spv" }
@@ -980,13 +1047,19 @@ Graphics::Graphics()
 , renderer { device, swapchain, line_layout, mesh_layout }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
-, framebuffers { swapchain.create_framebuffers( render_pass ) }
+, framebuffers { swapchain.create_framebuffers( depth_views, render_pass ) }
 , graphics_queue { device.find_graphics_queue() }
 , present_queue { device.find_present_queue( surface.handle ) }
 , images { device }
 {
 	for ( size_t i = 0; i < swapchain.images.size(); ++i )
 	{
+		auto depth = Image( device, swapchain.extent, VK_FORMAT_D32_SFLOAT );
+		depth.transition( VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+		auto view = ImageView( depth );
+		depth_images.emplace_back( std::move( depth ) );
+		depth_views.emplace_back( std::move( view ) );
+
 		images_available.emplace_back( device );
 		images_drawn.emplace_back( device );
 		frames_in_flight.emplace_back( device );
@@ -1049,7 +1122,7 @@ bool Graphics::render_begin()
 			viewport,
 			scissor );
 
-		framebuffers = swapchain.create_framebuffers( render_pass );
+		framebuffers = swapchain.create_framebuffers( depth_views, render_pass );
 
 		for ( auto& fence : frames_in_flight )
 		{

@@ -144,6 +144,7 @@ class PhysicalDevice
 	std::vector<VkSurfaceFormatKHR> get_formats( VkSurfaceKHR s );
 	std::vector<VkPresentModeKHR> get_present_modes( VkSurfaceKHR s );
 	uint32_t get_memory_type( uint32_t type_filter, VkMemoryPropertyFlags f );
+	VkFormatProperties get_format_properties( VkFormat f );
 
 	VkPhysicalDevice handle = VK_NULL_HANDLE;
 	VkPhysicalDeviceProperties properties;
@@ -207,9 +208,6 @@ class Queue
 };
 
 
-class Swapchain;
-
-
 class Device
 {
   public:
@@ -258,7 +256,7 @@ class RenderPass
 class Framebuffer
 {
   public:
-	Framebuffer( VkImageView view, VkExtent2D& extent, RenderPass& render_pass );
+	Framebuffer( const std::vector<VkImageView>& view, VkExtent2D& extent, RenderPass& render_pass );
 	~Framebuffer();
 
 	Framebuffer( Framebuffer&& other );
@@ -276,7 +274,9 @@ class Swapchain
 	Swapchain( Device& d );
 	~Swapchain();
 
-	std::vector<Framebuffer> create_framebuffers( RenderPass& render_pass );
+	std::vector<Framebuffer> create_framebuffers( 
+		const std::vector<ImageView>& image_views,
+		RenderPass& render_pass );
 
 	void recreate();
 
@@ -365,6 +365,8 @@ class Graphics
 	RequiredExtensions device_required_extensions = { 1, &swapchain_extension_name };
 	Device device;
 	Swapchain swapchain;
+	std::vector<Image> depth_images;
+	std::vector<ImageView> depth_views;
 
 	RenderPass render_pass;
 

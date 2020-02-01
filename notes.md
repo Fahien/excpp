@@ -1,6 +1,6 @@
 [x] Graphics::draw function should take as parameter a collection of vertices to render as points or lines primitives.
 
-[] Another Graphics::draw function will take as parameter a mesh, or a collection of meshes, or a scene, to render as triangles primitives.
+[x] Another Graphics::draw function will take as parameter a mesh, or a collection of meshes, or a scene, to render as triangles primitives.
 
 [] In order to optimize performances, these functions should not create vulkan resources needed to draw. These resources should be created upfront, or asynchronously and used when ready.
 
