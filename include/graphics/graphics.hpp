@@ -420,6 +420,9 @@ class Graphics
 	Queue& present_queue;
 
 	Images images;
+
+	math::Mat4 view = math::Mat4::identity;
+	math::Mat4 proj = math::Mat4::identity;
 };
 
 

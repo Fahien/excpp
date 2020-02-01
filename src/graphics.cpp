@@ -990,6 +990,81 @@ std::vector<VkDescriptorSetLayoutBinding> get_mesh_bindings()
 }
 
 
+math::Mat4 perspective( const float a, const float y, const float f, const float n )
+{
+	math::Mat4 proj = {};
+
+	// Calculate projection matrix
+	float cotfov = 1.0f / std::tan( 0.5f * y );
+	proj[0] = cotfov / a;
+	proj[5] = cotfov;
+	proj[10] = -( n + f ) / ( f - n );
+	proj[14] = -2.0f * n * f / ( f - n );
+	proj[11] = -1.0f;
+
+	return proj;
+}
+
+
+math::Mat4 look_at( const math::Vec3& eye, const math::Vec3& center, math::Vec3 up )
+{
+	math::Vec3 forward = eye - center;
+	forward.normalize();
+
+	math::Vec3 right = math::Vec3::cross( up, forward );
+	right.normalize();
+
+	up = math::Vec3::cross( forward, right );
+	up.normalize();
+
+	math::Mat4 matrix = {};
+
+	matrix[0] = right.x;
+	matrix[4] = right.y;
+	matrix[8] = right.z;
+	matrix[12] = -math::Vec3::dot( right, eye );
+	matrix[1] = up.x;
+	matrix[5] = up.y;
+	matrix[9] = up.z;
+	matrix[13] = -math::Vec3::dot( up, eye );
+	matrix[2] = forward.x;
+	matrix[6] = forward.y;
+	matrix[10] = forward.z;
+	matrix[14] = -math::Vec3::dot( forward, eye );
+	matrix[3] = 0;
+	matrix[7] = 0;
+	matrix[11] = 0;
+	matrix[15] = 1.0f;
+
+	return matrix;
+}
+
+math::Mat4 ortho( float left, float right, float bottom, float top, float near, float far )
+{
+	math::Vec3 mid;
+	mid.x = ( left + right ) / ( right - left );
+	mid.y = ( bottom + top ) / ( bottom - top );
+	mid.z = near / ( near - far );
+
+	math::Vec3 scale;
+	scale.x = 2.0f / ( right - left );
+	scale.y = 2.0f / ( bottom - top );
+	scale.z = 1.0f / ( near - far );
+
+	math::Mat4 mat = math::Mat4::identity;
+
+	mat[12] = -mid.x;
+	mat[13] = -mid.y;
+	mat[14] = mid.z;
+
+	mat[0] = scale.x;
+	mat[5] = -scale.y;
+	mat[10] = scale.z;
+
+	return mat;
+}
+
+
 Graphics::Graphics()
 : instance { glfw.required_extensions, get_validation_layers() }
 , surface { instance, window }
@@ -1040,6 +1115,11 @@ Graphics::Graphics()
 , graphics_queue { device.find_graphics_queue() }
 , present_queue { device.find_present_queue( surface.handle ) }
 , images { device }
+, view { look_at(
+	math::Vec3( 0.0f, 2.0f, -2.0f ),
+	math::Vec3( 0.0f, 0.0f, 0.0f ),
+	math::Vec3( 0.0f, 1.0f, 0.0f ) ) }
+, proj { ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 8.0f ) }
 {
 	for ( size_t i = 0; i < swapchain.images.size(); ++i )
 	{
@@ -1147,86 +1227,13 @@ void Graphics::render_end()
 	present_queue.present( { swapchain.handle }, { current_frame_index }, { image_drawn.handle } );
 }
 
-math::Mat4 perspective( const float a, const float y, const float f, const float n )
-{
-	math::Mat4 proj = {};
-
-	// Calculate projection matrix
-	float cotfov = 1.0f / std::tan( 0.5f * y );
-	proj[0] = cotfov / a;
-	proj[5] = cotfov;
-	proj[10] = -( n + f ) / ( f - n );
-	proj[14] = -2.0f * n * f / ( f - n );
-	proj[11] = -1.0f;
-
-	return proj;
-}
-
-
-math::Mat4 look_at( const math::Vec3& eye, const math::Vec3& center, math::Vec3 up )
-{
-	math::Vec3 forward = eye - center;
-	forward.normalize();
-
-	math::Vec3 right = math::Vec3::cross( up, forward );
-	right.normalize();
-
-	up = math::Vec3::cross( forward, right );
-	up.normalize();
-
-	math::Mat4 matrix = {};
-
-	matrix[0] = right.x;
-	matrix[4] = right.y;
-	matrix[8] = right.z;
-	matrix[12] = -math::Vec3::dot( right, eye );
-	matrix[1] = up.x;
-	matrix[5] = up.y;
-	matrix[9] = up.z;
-	matrix[13] = -math::Vec3::dot( up, eye );
-	matrix[2] = forward.x;
-	matrix[6] = forward.y;
-	matrix[10] = forward.z;
-	matrix[14] = -math::Vec3::dot( forward, eye );
-	matrix[3] = 0;
-	matrix[7] = 0;
-	matrix[11] = 0;
-	matrix[15] = 1.0f;
-
-	return matrix;
-}
-
-math::Mat4 ortho( float left, float right, float bottom, float top, float near, float far )
-{
-	math::Vec3 mid;
-	mid.x = ( left + right ) / ( right - left );
-	mid.y = ( bottom + top ) / ( bottom - top );
-	mid.z = near / ( near - far );
-
-	math::Vec3 scale;
-	scale.x = 2.0f / ( right - left );
-	scale.y = 2.0f / ( bottom - top );
-	scale.z = 1.0f / ( near - far );
-
-	math::Mat4 mat = math::Mat4::identity;
-
-	mat[12] = -mid.x;
-	mat[13] = -mid.y;
-	mat[14] = mid.z;
-
-	mat[0] = scale.x;
-	mat[5] = -scale.y;
-	mat[10] = scale.z;
-
-	return mat;
-}
 
 void Graphics::draw( Triangle& tri )
 {
 	auto& resources = renderer.triangle_resources.find( &tri )->second;
 
-	tri.ubo.view = look_at( math::Vec3( 0.0, 0.0f, 1.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
-	tri.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 2.0f );
+	tri.ubo.view = view;
+	tri.ubo.proj = proj;
 
 	auto data = reinterpret_cast<const uint8_t*>( &tri.ubo );
 	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];
@@ -1246,8 +1253,8 @@ void Graphics::draw( Rect& rect )
 {
 	auto& resources = renderer.rect_resources.find( &rect )->second;
 
-	rect.ubo.view = look_at( math::Vec3( 0.0f, 0.0f, 1.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
-	rect.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 1.0f );
+	rect.ubo.view = view;
+	rect.ubo.proj = proj;
 
 	auto data = reinterpret_cast<const uint8_t*>( &rect.ubo );
 	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];
@@ -1270,8 +1277,8 @@ void Graphics::draw( Mesh& mesh )
 
 	auto& resources = pair->second;
 
-	mesh.ubo.view = look_at( math::Vec3( 0.0f, 2.0f, -2.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
-	mesh.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 8.0f );
+	mesh.ubo.view = view;
+	mesh.ubo.proj = proj;
 
 	auto data = reinterpret_cast<const uint8_t*>( &mesh.ubo );
 	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];

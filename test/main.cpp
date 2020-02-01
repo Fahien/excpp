@@ -75,7 +75,10 @@ void run()
 	quad.image_view = view;
 
 	auto square = Rect( Dot( Point( -0.5f, -0.5f ) ), Dot( Point( 0.5f, 0.5f ) ) );
-	auto triangle = Triangle( Dot( Point( -0.3f, -0.3f ) ), Dot( Point( 0.3f, -0.3f ) ), Dot( Point( 0.0f, 0.3f ) ) );
+	auto triangle = Triangle(
+		Dot( Point( -1.0f, -1.0f ) ),
+		Dot( Point( 1.0f, -1.0f ) ),
+		Dot( Point( 0.0f, 1.0f ) ) );
 	graphics.renderer.add( square );
 	graphics.renderer.add( triangle );
 	graphics.renderer.add( quad );
