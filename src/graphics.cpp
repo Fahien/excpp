@@ -556,14 +556,31 @@ Swapchain::~Swapchain()
 }
 
 
-std::vector<Framebuffer> Swapchain::create_framebuffers( const std::vector<ImageView>& depth_views, RenderPass& render_pass )
+Frames::Frames( Swapchain& swapchain )
+{
+	for ( size_t i = 0; i < swapchain.images.size(); ++i )
+	{
+		color_images.emplace_back( swapchain.images[i] );
+		color_views.emplace_back( swapchain.views[i] );
+
+		auto depth = Image( swapchain.device, swapchain.extent, VK_FORMAT_D32_SFLOAT );
+		depth.transition( VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+		auto view = ImageView( depth );
+		depth_images.emplace_back( std::move( depth ) );
+		depth_views.emplace_back( std::move( view ) );
+	}
+}
+
+
+std::vector<Framebuffer> Frames::create_framebuffers( RenderPass& render_pass )
 {
 	std::vector<Framebuffer> framebuffers;
-	for ( size_t i = 0; i < views.size(); ++i )
+	for ( size_t i = 0; i < color_views.size(); ++i )
 	{
-		auto color_view = views[i];
+		auto color_view = color_views[i];
 		auto depth_view = depth_views[i].handle;
 		std::vector<VkImageView> views = { color_view, depth_view };
+		VkExtent2D extent = { depth_images[i].extent.width, depth_images[i].extent.height };
 		auto framebuffer = Framebuffer( views, extent, render_pass );
 		framebuffers.emplace_back( std::move( framebuffer ) );
 	}
@@ -973,40 +990,12 @@ std::vector<VkDescriptorSetLayoutBinding> get_mesh_bindings()
 }
 
 
-std::vector<Image> create_depth_images( const Swapchain& swapchain )
-{
-	std::vector<Image> images;
-
-	for ( size_t i = 0; i < swapchain.images.size(); ++i )
-	{
-		auto depth = Image( swapchain.device, swapchain.extent, VK_FORMAT_D32_SFLOAT );
-		depth.transition( VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
-		images.emplace_back( std::move( depth ) );
-	}
-
-	return images;
-}
-
-std::vector<ImageView> create_depth_views( const std::vector<Image>& images )
-{
-	std::vector<ImageView> views;
-
-	for( auto& image : images )
-	{
-		auto view = ImageView( image );
-		views.emplace_back( std::move( view ) );
-	}
-
-	return views;
-}
-
 Graphics::Graphics()
 : instance { glfw.required_extensions, get_validation_layers() }
 , surface { instance, window }
 , device { instance.physical_devices.at( 0 ), surface.handle, device_required_extensions }
 , swapchain { device }
-, depth_images { create_depth_images( swapchain ) }
-, depth_views { create_depth_views( depth_images ) }
+, frames { swapchain }
 , render_pass { swapchain }
 , line_vert { device, "line.vert.spv" }
 , line_frag { device, "line.frag.spv" }
@@ -1047,19 +1036,13 @@ Graphics::Graphics()
 , renderer { device, swapchain, line_layout, mesh_layout }
 , command_pool { device }
 , command_buffers { command_pool.allocate_command_buffers( swapchain.images.size() ) }
-, framebuffers { swapchain.create_framebuffers( depth_views, render_pass ) }
+, framebuffers { frames.create_framebuffers( render_pass ) }
 , graphics_queue { device.find_graphics_queue() }
 , present_queue { device.find_present_queue( surface.handle ) }
 , images { device }
 {
 	for ( size_t i = 0; i < swapchain.images.size(); ++i )
 	{
-		auto depth = Image( device, swapchain.extent, VK_FORMAT_D32_SFLOAT );
-		depth.transition( VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
-		auto view = ImageView( depth );
-		depth_images.emplace_back( std::move( depth ) );
-		depth_views.emplace_back( std::move( view ) );
-
 		images_available.emplace_back( device );
 		images_drawn.emplace_back( device );
 		frames_in_flight.emplace_back( device );
@@ -1122,7 +1105,8 @@ bool Graphics::render_begin()
 			viewport,
 			scissor );
 
-		framebuffers = swapchain.create_framebuffers( depth_views, render_pass );
+		frames = Frames( swapchain );
+		framebuffers = frames.create_framebuffers( render_pass );
 
 		for ( auto& fence : frames_in_flight )
 		{
@@ -1301,7 +1285,6 @@ void Graphics::draw( Mesh& mesh )
 	current_command_buffer->bind_descriptor_sets( mesh_layout, descriptor_set );
 	current_command_buffer->draw_indexed( resources.index_buffer.count() );
 }
-
 
 
 } // namespace graphics

@@ -274,10 +274,6 @@ class Swapchain
 	Swapchain( Device& d );
 	~Swapchain();
 
-	std::vector<Framebuffer> create_framebuffers( 
-		const std::vector<ImageView>& image_views,
-		RenderPass& render_pass );
-
 	void recreate();
 
 	Device& device;
@@ -293,6 +289,24 @@ class Swapchain
 	void create();
 
 	void destroy_views();
+};
+
+
+class Frames
+{
+  public:
+	Frames( Swapchain& s );
+
+	Frames( Frames&& o ) = default;
+	Frames& operator=( Frames&& o ) = default;
+
+	std::vector<Framebuffer> create_framebuffers( RenderPass& render_pass );
+
+	std::vector<VkImage> color_images;
+	std::vector<VkImageView> color_views;
+
+	std::vector<Image> depth_images;
+	std::vector<ImageView> depth_views;
 };
 
 
@@ -365,8 +379,7 @@ class Graphics
 	RequiredExtensions device_required_extensions = { 1, &swapchain_extension_name };
 	Device device;
 	Swapchain swapchain;
-	std::vector<Image> depth_images;
-	std::vector<ImageView> depth_views;
+	Frames frames;
 
 	RenderPass render_pass;
 
