@@ -1,9 +1,9 @@
-#include <graphics/image.h>
+#include "graphics/images.h"
 
 #include <cassert>
 
-#include <graphics/png.h>
-#include <graphics/graphics.hpp>
+#include "graphics/png.h"
+#include "graphics/graphics.hpp"
 
 namespace graphics
 {
@@ -227,5 +227,43 @@ Sampler& Sampler::operator=( Sampler&& other )
 	std::swap( handle, other.handle );
 	return *this;
 }
+
+
+Images::Images( Device& d )
+: device { d }
+{}
+
+
+VkImageView Images::load( const char* path )
+{
+	VkImageView ret = VK_NULL_HANDLE;
+
+	auto it = images.find( path );
+	if ( it == std::end( images ) )
+	{
+		auto png = Png( path );
+		auto png_size = png.get_size();
+		auto staging_buffer = Buffer( device, png_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT );
+		auto mem = reinterpret_cast<png_byte*>( staging_buffer.map( png_size ) );
+		png.load( mem );
+		staging_buffer.unmap();
+
+		auto image = Image( device, png );
+		image.upload( staging_buffer );
+		auto view = ImageView( device, image );
+		ret = view.handle;
+
+		auto pair = std::make_pair( std::move( image ), std::move( view ) );
+		auto[res, ok] = images.emplace( path, std::move( pair ) );
+		assert( ok && "Cannot store image" );
+	}
+	else
+	{
+		ret = it->second.second.handle;
+	}
+
+	return ret;
+}
+
 
 } // namespace graphics

@@ -983,6 +983,7 @@ Graphics::Graphics()
 , framebuffers { swapchain.create_framebuffers( render_pass ) }
 , graphics_queue { device.find_graphics_queue() }
 , present_queue { device.find_present_queue( surface.handle ) }
+, images { device }
 {
 	for ( size_t i = 0; i < swapchain.images.size(); ++i )
 	{
@@ -1157,7 +1158,7 @@ math::Mat4 ortho( float left, float right, float bottom, float top, float near, 
 	mat[14] = mid.z;
 
 	mat[0] = scale.x;
-	mat[5] = scale.y;
+	mat[5] = -scale.y;
 	mat[10] = scale.z;
 
 	return mat;
@@ -1212,8 +1213,8 @@ void Graphics::draw( Mesh& mesh )
 
 	auto& resources = pair->second;
 
-	mesh.ubo.view = look_at( math::Vec3( 0.0f, 0.0f, 2.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
-	mesh.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 2.0f );
+	mesh.ubo.view = look_at( math::Vec3( 0.0f, 2.0f, -2.0f ), math::Vec3( 0.0f, 0.0f, 0.0f ), math::Vec3( 0.0f, 1.0f, 0.0f ) );
+	mesh.ubo.proj = ortho( -1.0f, 1.0f, -1.0f, 1.0f, 0.125f, 8.0f );
 
 	auto data = reinterpret_cast<const uint8_t*>( &mesh.ubo );
 	auto& uniform_buffer = resources.uniform_buffers[current_frame_index];

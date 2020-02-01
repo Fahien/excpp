@@ -4,7 +4,7 @@
 
 #include "graphics/graphics.hpp"
 #include "graphics/png.h"
-#include "graphics/image.h"
+#include "graphics/images.h"
 
 void update( const double dt, graphics::Triangle& r )
 {
@@ -39,22 +39,22 @@ graphics::Mesh create_quad()
 		Vertex(
 			Point( -0.5f, -0.5f, 0.0f ),
 			Color( 0.3f, 0.0f, 0.0f, 0.5f ),
-			Coord( 0.0f, 1.0 ) // a
+			Coord( 0.0f, 0.0 ) // a
 		),
 		Vertex(
 			Point( 0.5f, -0.5f, 0.0f ),
 			Color( 0.0f, 0.3f, 0.0f, 0.5f ),
-			Coord( 1.0f, 1.0 ) // b
+			Coord( 1.0f, 0.0 ) // b
 		),
 		Vertex(
 			Point( -0.5f, 0.5f, 0.0f ),
 			Color( 0.3f, 0.0f, 0.3f, 0.5f ),
-			Coord( 0.0f, 0.0 )  // d
+			Coord( 0.0f, 1.0 ) // d
 		),
 		Vertex(
 			Point( 0.5f, 0.5f, 0.0f ),
 			Color( 0.0f, 0.0f, 0.3f, 0.5f ),
-			Coord( 1.0f, 0.0 ) // c
+			Coord( 1.0f, 1.0 ) // c
 		),
 	};
 
@@ -64,33 +64,15 @@ graphics::Mesh create_quad()
 	return quad;
 }
 
-graphics::Image load_image( graphics::Graphics& graphics, const char* path )
-{
-	using namespace graphics;
-
-	auto png = Png( path );
-	auto png_size = png.get_size();
-	auto staging_buffer = Buffer( graphics.device, png_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT );
-	auto mem = reinterpret_cast<png_byte*>( staging_buffer.map( png_size ) );
-	png.load( mem );
-	staging_buffer.unmap();
-
-	auto image = Image( graphics.device, png );
-	image.upload( staging_buffer );
-	return image;
-}
-
 void run()
 {
 	using namespace graphics;
 
 	auto graphics = Graphics();
 
-	auto image = load_image( graphics, "img/lena.png" );
-	auto view = ImageView( graphics.device, image );
-
+	auto view = graphics.images.load( "img/lena.png" );
 	auto quad = create_quad();
-	quad.image_view = &view;
+	quad.image_view = view;
 
 	auto square = Rect( Dot( Point( -0.5f, -0.5f ) ), Dot( Point( 0.5f, 0.5f ) ) );
 	auto triangle = Triangle( Dot( Point( -0.3f, -0.3f ) ), Dot( Point( 0.3f, -0.3f ) ), Dot( Point( 0.0f, 0.3f ) ) );
@@ -104,8 +86,8 @@ void run()
 		auto dt = graphics.glfw.get_delta();
 
 		update(dt, triangle);
-		//update_rect(dt, square.ubo);
-		//update_rect(dt, quad.ubo);
+		update_rect(dt, square.ubo);
+		update_rect(dt, quad.ubo);
 
 		if ( graphics.render_begin() )
 		{

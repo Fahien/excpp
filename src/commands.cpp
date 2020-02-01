@@ -3,7 +3,7 @@
 #include <cassert>
 
 #include "graphics/graphics.hpp"
-#include "graphics/image.h"
+#include "graphics/images.h"
 
 
 namespace graphics

@@ -4,7 +4,7 @@
 
 #include "graphics/buffers.h"
 #include "graphics/descriptors.h"
-#include "graphics/image.h"
+#include "graphics/images.h"
 
 namespace graphics
 {
@@ -37,7 +37,7 @@ struct Resources
 
 struct MeshResources
 {
-	MeshResources( Device& device, Swapchain& swapchain, PipelineLayout& l, ImageView& image_view );
+	MeshResources( Device& device, Swapchain& swapchain, PipelineLayout& l, VkImageView image_view );
 
 	// Vertices and indices do not change, hence one is enough
 	DynamicBuffer vertex_buffer;

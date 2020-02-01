@@ -11,6 +11,7 @@
 #include "graphics/renderer.hpp"
 #include "graphics/descriptors.h"
 #include "graphics/commands.h"
+#include "graphics/images.h"
 #include "math/math.h"
 
 
@@ -116,7 +117,7 @@ struct Mesh
 
 	UniformBufferObject ubo = {};
 
-	ImageView* image_view = nullptr;
+	VkImageView image_view = VK_NULL_HANDLE;
 };
 
 
@@ -402,6 +403,8 @@ class Graphics
 
 	Queue& graphics_queue;
 	Queue& present_queue;
+
+	Images images;
 };
 
 

@@ -76,7 +76,7 @@ std::vector<VkDescriptorPoolSize> get_mesh_pool_size( const uint32_t count )
 }
 
 
-MeshResources::MeshResources( Device& d, Swapchain& s, PipelineLayout& l, ImageView& image_view )
+MeshResources::MeshResources( Device& d, Swapchain& s, PipelineLayout& l, VkImageView image_view )
 : vertex_buffer { d, sizeof( Vertex ), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT }
 , index_buffer { d, sizeof( Index ), VK_BUFFER_USAGE_INDEX_BUFFER_BIT }
 , uniform_buffers {}
@@ -101,7 +101,7 @@ MeshResources::MeshResources( Device& d, Swapchain& s, PipelineLayout& l, ImageV
 
 		VkDescriptorImageInfo image_info = {};
 		image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		image_info.imageView = image_view.handle;
+		image_info.imageView = image_view;
 		image_info.sampler = sampler.handle;
 
 		std::array<VkWriteDescriptorSet, 2> writes = {};
@@ -190,7 +190,7 @@ void Renderer::add( const Mesh& mesh )
 	{
 		auto[new_it, ok] = mesh_resources.emplace(
 			&mesh,
-			MeshResources( device, swapchain, mesh_layout, *mesh.image_view )
+			MeshResources( device, swapchain, mesh_layout, mesh.image_view )
 		);
 		if (ok)
 		{

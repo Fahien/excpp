@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include <vulkan/vulkan_core.h>
 
 #include "graphics/commands.h"
@@ -62,6 +64,23 @@ class Sampler
 
 	Device& device;
 	VkSampler handle = VK_NULL_HANDLE;
+};
+
+
+/// @brief Image repository
+class Images
+{
+  public:
+	Images( Device& d );
+
+	/// @brief Loads an image
+	/// @return an image view to that image
+	VkImageView load( const char* path );
+
+	/// Map of paths and Vulkan images and image views
+	std::unordered_map<const char*, std::pair<Image, ImageView>> images = {};
+
+	Device& device;
 };
 
 
